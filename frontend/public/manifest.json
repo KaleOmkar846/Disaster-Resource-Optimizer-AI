@@ -1,0 +1,18 @@
+{
+"short_name": "Disaster Response",
+"name": "Disaster Response Volunteer Dashboard",
+"description": "Offline-first volunteer dashboard for disaster response verification",
+"icons": [
+{
+"src": "/vite.svg",
+"sizes": "192x192",
+"type": "image/svg+xml",
+"purpose": "any maskable"
+}
+],
+"start_url": "/",
+"display": "standalone",
+"theme_color": "#1976d2",
+"background_color": "#ffffff",
+"orientation": "portrait"
+}

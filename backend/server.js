@@ -5,6 +5,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import smsWebhookRoutes from './routes/smsWebhook.js';
+import needsRoutes from './routes/needs.js';  // Add this import
 
 dotenv.config();
 
@@ -28,6 +29,7 @@ app.use(express.json());
 // --- Register Routes ---
 // SMS Webhook for Twilio - All incoming SMS messages will be handled here
 app.use('/api', smsWebhookRoutes);
+app.use('/api/needs', needsRoutes);  // Add this line
 
 // --- API Endpoint for Part 3 (Optimization) ---
 app.post('/api/optimize-route', (req, res) => {
