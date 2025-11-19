@@ -1,25 +1,36 @@
-// Aegis AI/client/src/App.jsx
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { SyncStatus } from "./components";
+import { VolunteerPage, DashboardPage } from "./pages";
+import "./App.css";
 
-import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-
-// Import your page components
-import VolunteerPage from './pages/VolunteerPage';
-import DashboardPage from './pages/DashboardPage';
+// Create a react-query client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Route for the volunteer PWA */}
-        <Route path="/" element={<VolunteerPage />} />
-        
-        {/* Route for your manager dashboard */}
-        <Route path="/dashboard" element={<DashboardPage />} />
-      </Routes>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <Routes>
+          {/* Route for the volunteer PWA */}
+          <Route path="/" element={<VolunteerPage />} />
+
+          {/* Route for your manager dashboard */}
+          <Route path="/dashboard" element={<DashboardPage />} />
+        </Routes>
+
+        {/* Global sync status indicator */}
+        <SyncStatus />
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
 
-// THIS IS THE CRITICAL LINE THAT FIXES THE ERROR
 export default App;

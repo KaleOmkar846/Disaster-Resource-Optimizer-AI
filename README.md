@@ -5,6 +5,7 @@ An AI-powered platform for optimizing disaster response through intelligent SMS 
 ## 🌟 Features
 
 ### Part 1: SMS Chatbot (Citizen Interface) ✅ IMPLEMENTED
+
 - **AI-Powered Triage**: Uses Google Gemini AI to automatically categorize and prioritize incoming citizen reports
 - **SMS Integration**: Citizens text their needs to a Twilio number
 - **Intelligent Classification**: Automatically categorizes needs (Water, Food, Medical, Rescue, Other)
@@ -13,11 +14,13 @@ An AI-powered platform for optimizing disaster response through intelligent SMS 
 - **MongoDB Storage**: All reports stored with structured data for easy processing
 
 ### Part 2: Volunteer Dashboard (Coming Soon)
+
 - Web interface for volunteers to verify citizen reports
 - Real-time updates and notifications
 - Verification workflow
 
 ### Part 3: Manager & Resource Optimization ✅ IMPLEMENTED
+
 - AI-powered resource allocation
 - Route optimization for resource delivery
 - Real-time tracking and analytics
@@ -27,19 +30,60 @@ An AI-powered platform for optimizing disaster response through intelligent SMS 
 This project consists of a React Vite frontend and a Node.js Express backend.
 
 ```
-├── frontend/          # React Vite application
-├── backend/           # Node.js Express server
-│   ├── models/        # Mongoose schemas
-│   │   └── Need.js    # ✅ Citizen report schema
-│   ├── services/      # Business logic services
-│   │   └── geminiService.js  # ✅ AI triage service
-│   ├── routes/        # API routes
-│   │   └── smsWebhook.js     # ✅ Twilio webhook
+├── frontend/                      # React Vite application
+│   ├── src/
+│   │   ├── components/           # Reusable UI components
+│   │   │   ├── Map.jsx/css       # ✅ Leaflet map container
+│   │   │   ├── MapPin.jsx/css    # ✅ Custom map markers
+│   │   │   ├── RouteLine.jsx/css # ✅ Route visualization
+│   │   │   ├── SyncStatus.jsx/css # ✅ Offline sync indicator
+│   │   │   ├── VolunteerTaskList.jsx/css # ✅ Task verification list
+│   │   │   └── index.js          # Component exports
+│   │   ├── pages/                # Page-level components
+│   │   │   ├── DashboardPage.jsx/css # ✅ Manager dashboard
+│   │   │   ├── VolunteerPage.jsx/css # ✅ Volunteer portal
+│   │   │   └── index.js          # Page exports
+│   │   ├── services/             # API and data services
+│   │   │   ├── api.js            # ✅ Route optimization API
+│   │   │   ├── apiService.js     # ✅ Task/needs API
+│   │   │   ├── verificationService.js # ✅ Offline-first verification
+│   │   │   ├── db.js             # ✅ IndexedDB (Dexie) setup
+│   │   │   └── index.js          # Service exports
+│   │   ├── hooks/                # Custom React hooks
+│   │   │   ├── useSyncManager.js # ✅ Offline sync manager
+│   │   │   └── index.js          # Hook exports
+│   │   ├── App.jsx/css           # ✅ Root app component
+│   │   ├── main.jsx              # ✅ React entry point
+│   │   └── index.css             # ✅ Global styles & CSS variables
+│   └── package.json
+├── backend/                  # Node.js Express server
+│   ├── app.js                # Express app factory (middlewares + routes)
+│   ├── server.js             # Startup/bootstrap logic
+│   ├── controllers/          # Request handlers
+│   │   ├── smsController.js  # ✅ Twilio webhook orchestration
+│   │   ├── taskController.js # ✅ Volunteer/task endpoints
+│   │   └── routeController.js # ✅ Route optimization handler
+│   ├── routes/               # API route registrations
+│   │   ├── index.js          # ✅ Central router
+│   │   ├── smsWebhook.js     # ✅ SMS webhook route
+│   │   ├── tasks.js          # ✅ Need/task routes
+│   │   └── optimization.js   # ✅ Route optimization
+│   ├── services/             # Business logic services
+│   │   ├── geminiService.js  # ✅ AI triage service
+│   │   ├── geocodeService.js # ✅ Location geocoding
+│   │   └── routeOptimizationService.js # ✅ TSP solver
+│   ├── models/               # Mongoose schemas
+│   │   └── Need.js           # ✅ Citizen report schema
+│   ├── utils/
+│   │   └── smsParser.js      # ✅ Fallback parsing helpers
+│   ├── config/
+│   │   ├── index.js          # ✅ Environment config
+│   │   └── database.js       # ✅ MongoDB connection
 │   ├── SETUP_GUIDE.md        # ✅ Comprehensive setup instructions
 │   ├── QUICK_START.md        # ✅ 5-minute quick start
 │   ├── CHECKLIST.md          # ✅ Implementation checklist
 │   └── test-sms-webhook.js   # ✅ Testing script
-└── package.json       # Root package.json with scripts
+└── package.json              # Root package.json with scripts
 ```
 
 ## 🚀 Getting Started
@@ -55,11 +99,13 @@ This project consists of a React Vite frontend and a Node.js Express backend.
 ### Quick Installation
 
 1. **Install all dependencies:**
+
    ```bash
    npm run install:all
    ```
 
 2. **Configure Backend Environment:**
+
    ```bash
    cd backend
    cp .env.example .env
@@ -67,6 +113,7 @@ This project consists of a React Vite frontend and a Node.js Express backend.
    ```
 
 3. **Required Environment Variables:**
+
    ```env
    MONGO_URI=mongodb+srv://...
    TWILIO_ACCOUNT_SID=ACxxxxx...
@@ -83,11 +130,13 @@ This project consists of a React Vite frontend and a Node.js Express backend.
 ### Running the Application
 
 **Run both frontend and backend:**
+
 ```bash
 npm run dev
 ```
 
 **Or run separately:**
+
 ```bash
 npm run frontend  # Runs on http://localhost:5173
 npm run backend   # Runs on http://localhost:3000
@@ -98,9 +147,11 @@ npm run backend   # Runs on http://localhost:3000
 For detailed SMS chatbot setup and testing:
 
 1. **📖 Read the Setup Guide:**
+
    - See `backend/SETUP_GUIDE.md` for comprehensive instructions
 
 2. **⚡ Quick Start (5 minutes):**
+
    - See `backend/QUICK_START.md` for rapid deployment
 
 3. **✅ Follow the Checklist:**
@@ -117,15 +168,16 @@ For detailed SMS chatbot setup and testing:
 ### For Citizens
 
 1. **Send a text message** to your configured Twilio number:
+
    ```
-   Help! We need water and medicine at 123 Main Street. 
+   Help! We need water and medicine at 123 Main Street.
    My grandmother is sick.
    ```
 
 2. **Receive confirmation:**
    ```
-   Your request has been received and logged. 
-   A volunteer will verify it soon. 
+   Your request has been received and logged.
+   A volunteer will verify it soon.
    Your Report ID: 507f1f77bcf86cd799439011
    ```
 
@@ -143,12 +195,14 @@ For detailed SMS chatbot setup and testing:
 ## 🧪 Testing
 
 ### Automated Testing
+
 ```bash
 cd backend
 node test-sms-webhook.js
 ```
 
 This will:
+
 - ✅ Verify all environment variables
 - ✅ Test Gemini AI triage with sample messages
 - ✅ Test MongoDB connection
@@ -159,21 +213,25 @@ This will:
 Send these test messages to your Twilio number:
 
 **Medical Emergency:**
+
 ```
 URGENT: My father has chest pain. We're at 456 Oak Avenue. Need ambulance!
 ```
 
 **Water Request:**
+
 ```
 We need drinking water for 10 people at Central Community Center
 ```
 
 **Rescue:**
+
 ```
 Trapped in basement at 789 Pine Street. Water rising fast!
 ```
 
 **Food:**
+
 ```
 Need food for 3 families near the park on Main Street
 ```
@@ -191,16 +249,19 @@ Citizen (SMS) → Twilio → Webhook (/api/sms) → Gemini AI → MongoDB
 ### Technology Stack
 
 **Backend:**
+
 - Node.js + Express (API server)
 - Mongoose (MongoDB ODM)
 - Twilio (SMS gateway)
 - Google Gemini AI (NLP triage)
 
 **Frontend:**
+
 - React + Vite
 - (Volunteer dashboard - coming soon)
 
 **Database:**
+
 - MongoDB Atlas (cloud-hosted)
 
 ## 📚 Documentation
@@ -213,9 +274,11 @@ Citizen (SMS) → Twilio → Webhook (/api/sms) → Gemini AI → MongoDB
 ## 🔐 Security
 
 **Development Mode:**
+
 - Twilio webhook validation disabled for easier testing
 
 **Production Recommendations:**
+
 - Set `NODE_ENV=production` to enable Twilio signature validation
 - Implement rate limiting
 - Add phone number verification
@@ -239,12 +302,12 @@ This project is licensed under the MIT License.
 
 ### Common Issues
 
-| Issue | Solution |
-|-------|----------|
+| Issue            | Solution                                          |
+| ---------------- | ------------------------------------------------- |
 | SMS not received | Check ngrok is running, verify Twilio webhook URL |
-| MongoDB error | Verify MONGO_URI, check IP whitelist in Atlas |
-| Gemini API error | Verify API key, check quota limits |
-| 500 error | Check server logs for details |
+| MongoDB error    | Verify MONGO_URI, check IP whitelist in Atlas     |
+| Gemini API error | Verify API key, check quota limits                |
+| 500 error        | Check server logs for details                     |
 
 ### Getting Help
 
@@ -264,6 +327,7 @@ This project is licensed under the MIT License.
 ## 📊 Current Status
 
 **✅ Implemented:**
+
 - SMS reception via Twilio
 - AI-powered triage with Gemini
 - MongoDB data persistence
@@ -272,9 +336,11 @@ This project is licensed under the MIT License.
 - Testing scripts
 
 **🚧 In Progress:**
+
 - Volunteer verification dashboard
 
 **📅 Planned:**
+
 - Resource allocation system
 - Route optimization
 - Real-time tracking

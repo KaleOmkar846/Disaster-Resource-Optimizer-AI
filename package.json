@@ -11,7 +11,8 @@
   "scripts": {
     "frontend": "npm run dev --workspace=frontend",
     "backend": "npm run dev --workspace=backend",
-    "dev": "concurrently \"npm run backend\" \"npm run frontend\""
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "install all": "npm install --workspace=frontend && npm install --workspace=backend"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

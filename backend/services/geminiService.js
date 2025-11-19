@@ -1,10 +1,9 @@
-// File: services/geminiService.js
-
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import config from "../config/index.js";
 
 // Initialize the Gemini client
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+const genAI = new GoogleGenerativeAI(config.geminiApiKey);
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 /**
  * This is the master prompt for the Gemini AI.
@@ -82,29 +81,25 @@ async function triageSMS(messageBody) {
 
     // Parse the JSON text returned by Gemini
     const triageData = JSON.parse(jsonText);
-    
+
     // Basic validation (can be expanded)
-    const validNeed = ['Water', 'Food', 'Medical', 'Rescue', 'Other'].includes(triageData.needType);
-    const validUrgency = ['Low', 'Medium', 'High'].includes(triageData.urgency);
+    const validNeed = ["Water", "Food", "Medical", "Rescue", "Other"].includes(
+      triageData.needType
+    );
+    const validUrgency = ["Low", "Medium", "High"].includes(triageData.urgency);
 
     if (!validNeed || !validUrgency) {
-        console.warn('Gemini returned invalid enum values. Defaulting.');
-        // Handle cases where Gemini might hallucinate a new category
-        if (!validNeed) triageData.needType = 'Other';
-        if (!validUrgency) triageData.urgency = 'Medium';
+      console.warn("Gemini returned invalid enum values. Defaulting.");
+      // Handle cases where Gemini might hallucinate a new category
+      if (!validNeed) triageData.needType = "Other";
+      if (!validUrgency) triageData.urgency = "Medium";
     }
 
     return triageData;
-
   } catch (error) {
-    console.error('Error in Gemini Triage Service:', error);
-    // Fallback in case AI fails: Save the raw message with default values
-    return {
-      needType: 'Other',
-      location: 'Unknown',
-      details: `AI Triage Failed. Raw: ${messageBody}`,
-      urgency: 'Medium',
-    };
+    console.error("Error in Gemini Triage Service:", error.message);
+    // Throw error so webhook can use fallback parser
+    throw error;
   }
 }
 
