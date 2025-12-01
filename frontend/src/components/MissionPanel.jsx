@@ -31,15 +31,6 @@ function MissionPanel({
     setExpandedMissionId(expandedMissionId === missionId ? null : missionId);
   };
 
-  const formatTime = (timestamp) => {
-    if (!timestamp) return "Unknown";
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   const formatDistance = (meters) => {
     if (!meters) return "N/A";
     return meters >= 1000

@@ -1,6 +1,6 @@
 import Need from "../models/NeedModel.js";
 import { asyncHandler, ApiError } from "../middleware/index.js";
-import { sendSuccess, sendError } from "../utils/apiResponse.js";
+import { sendSuccess } from "../utils/apiResponse.js";
 import { logger } from "../utils/appLogger.js";
 import { STATUS } from "../constants/index.js";
 

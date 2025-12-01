@@ -4,7 +4,6 @@ import {
   Camera,
   Upload,
   MapPin,
-  RefreshCcw,
   CheckCircle,
   AlertTriangle,
   Loader2,
