@@ -17,7 +17,7 @@ import {
   SkipToContent,
   PinLogin,
 } from "./components";
-import { AuthProvider, useAuth } from "./contexts";
+import { AuthProvider, useAuth, VolunteerRouteProvider } from "./contexts";
 import { VolunteerPage, DashboardPage } from "./pages";
 import { LogOut } from "lucide-react";
 import "./App.css";
@@ -157,7 +157,9 @@ function AppWrapper() {
     <AccessibilityProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <App />
+          <VolunteerRouteProvider>
+            <App />
+          </VolunteerRouteProvider>
         </AuthProvider>
       </QueryClientProvider>
     </AccessibilityProvider>

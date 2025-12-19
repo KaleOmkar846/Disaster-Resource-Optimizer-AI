@@ -46,11 +46,19 @@
     "taskId": "कार्य आयडी",
     "description": "वर्णन",
     "notes": "नोट्स",
+    "location": "स्थान",
     "noDescription": "वर्णन नाही",
     "noNotes": "नोट्स नाहीत",
+    "noLocation": "या कार्याचे स्थान नाही.",
+    "locationRequired": "मार्ग सुरू करण्यासाठी तुमचे स्थान आवश्यक आहे. कृपया स्थान सेवा सक्षम करा.",
     "verify": "पडताळा",
     "verifying": "पडताळत आहे...",
-    "pendingSync": "सिंक बाकी"
+    "pendingSync": "सिंक बाकी",
+    "startRoute": "मार्ग सुरू करा",
+    "routeStarted": "मार्ग सक्रिय",
+    "routeActive": "मार्ग चालू आहे",
+    "cancelRoute": "मार्ग रद्द करा",
+    "calculatingRoute": "गणना होत आहे..."
   },
   "audio": {
     "title": "आवाज अहवाल",

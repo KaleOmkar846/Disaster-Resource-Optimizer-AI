@@ -1,5 +1,5 @@
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import "./Map.css";
@@ -7,6 +7,15 @@ import "./Map.css";
 import MapPin from "./MapPin";
 import RouteLine from "./RouteLine";
 import OfflineMapManager from "./OfflineMapManager";
+
+// User location icon for volunteer's current position
+const createUserLocationIcon = () =>
+  new L.DivIcon({
+    className: "user-location-icon",
+    html: `<div class="user-location-marker"><div class="user-location-pulse"></div><div class="user-location-dot"></div></div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
 
 // --- FIX for default Leaflet icon ---
 // This prevents the default marker icon from being broken
@@ -97,6 +106,7 @@ const ROUTE_COLORS = {
   hospital: "#ef4444",
   fire: "#f97316",
   rescue: "#10b981",
+  volunteer: "#8b5cf6",
   default: "#8b5cf6",
 };
 
@@ -107,9 +117,18 @@ function Map({
   missionRoutes = [],
   isRerouteMode = false,
   onStationClick,
+  volunteerMode = false,
+  volunteerLocation = null,
+  volunteerRoute = null,
+  isRouteFallback = false,
 }) {
-  // Center on Pune area to show all stations
-  const centerPosition = [18.52, 73.85];
+  // Center on Pune area to show all stations, or on volunteer location if in volunteer mode
+  const centerPosition = useMemo(() => {
+    if (volunteerMode && volunteerLocation) {
+      return [volunteerLocation.lat, volunteerLocation.lng];
+    }
+    return [18.52, 73.85];
+  }, [volunteerMode, volunteerLocation]);
 
   const handleStationClick = (e, station) => {
     console.log(
@@ -127,38 +146,57 @@ function Map({
   };
 
   return (
-    <MapContainer center={centerPosition} zoom={12} className="map-container">
+    <MapContainer
+      center={centerPosition}
+      zoom={volunteerMode ? 14 : 12}
+      className="map-container"
+    >
       {/* Base map tiles */}
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
 
-      {/* 1. Render Resource Station Markers */}
-      {RESOURCE_STATIONS.map((station, index) => (
-        <Marker
-          key={`station-${index}-${isRerouteMode}`}
-          position={[station.lat, station.lon]}
-          icon={getStationIcon(station.type, isRerouteMode)}
-          eventHandlers={{
-            click: (e) => handleStationClick(e, station),
-          }}
-        >
-          {!isRerouteMode && (
-            <Popup>
-              <div className="station-popup">
-                <strong>{station.name}</strong>
-                <br />
-                <span className="station-type">
-                  {station.type.toUpperCase()}
-                </span>
-              </div>
-            </Popup>
-          )}
-        </Marker>
-      ))}
+      {/* 1. Render Resource Station Markers - Only for managers, not volunteers */}
+      {!volunteerMode &&
+        RESOURCE_STATIONS.map((station, index) => (
+          <Marker
+            key={`station-${index}-${isRerouteMode}`}
+            position={[station.lat, station.lon]}
+            icon={getStationIcon(station.type, isRerouteMode)}
+            eventHandlers={{
+              click: (e) => handleStationClick(e, station),
+            }}
+          >
+            {!isRerouteMode && (
+              <Popup>
+                <div className="station-popup">
+                  <strong>{station.name}</strong>
+                  <br />
+                  <span className="station-type">
+                    {station.type.toUpperCase()}
+                  </span>
+                </div>
+              </Popup>
+            )}
+          </Marker>
+        ))}
 
-      {/* 2. Render all the 'Need' Pins */}
+      {/* 2. Render volunteer's current location marker */}
+      {volunteerMode && volunteerLocation && (
+        <Marker
+          position={[volunteerLocation.lat, volunteerLocation.lng]}
+          icon={createUserLocationIcon()}
+        >
+          <Popup>
+            <div className="user-location-popup">
+              <strong>📍 Your Location</strong>
+            </div>
+          </Popup>
+        </Marker>
+      )}
+
+      {/* 3. Render all the 'Need' Pins */}
       {needs.map((need) => (
         <MapPin
           key={need.id}
@@ -168,16 +206,29 @@ function Map({
         />
       ))}
 
-      {/* 3. Render mission routes from logistics agent */}
-      {missionRoutes.map((missionRoute, index) => (
-        <RouteLine
-          key={`mission-${index}-${missionRoute.vehicleId}`}
-          route={missionRoute.route}
-          color={ROUTE_COLORS[missionRoute.stationType] || ROUTE_COLORS.default}
-        />
-      ))}
+      {/* 4. Render mission routes from logistics agent - Only for managers */}
+      {!volunteerMode &&
+        missionRoutes.map((missionRoute, index) => (
+          <RouteLine
+            key={`mission-${index}-${missionRoute.vehicleId}`}
+            route={missionRoute.route}
+            color={
+              ROUTE_COLORS[missionRoute.stationType] || ROUTE_COLORS.default
+            }
+          />
+        ))}
 
-      {/* 4. Offline Map Manager for downloading tiles */}
+      {/* 5. Render volunteer route to assigned task */}
+      {volunteerMode && volunteerRoute && volunteerRoute.length >= 2 && (
+        <RouteLine
+          key="volunteer-route"
+          route={volunteerRoute}
+          color={ROUTE_COLORS.volunteer}
+          dashed={isRouteFallback}
+        />
+      )}
+
+      {/* 6. Offline Map Manager for downloading tiles */}
       <OfflineMapManager />
     </MapContainer>
   );

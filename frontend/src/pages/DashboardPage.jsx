@@ -16,19 +16,25 @@ import {
   ShelterManagement,
   VolunteerManagement,
 } from "../components";
-import { useAuth } from "../contexts";
+import { useAuth, useVolunteerRoute } from "../contexts";
 import {
   getNeedsForMap,
   getReports,
   getMissions,
   completeMission,
   rerouteMission,
+  getUnverifiedTasks,
 } from "../services";
 import "./DashboardPage.css";
 
 function DashboardPage() {
   const { t } = useTranslation();
-  const { isManager } = useAuth();
+  const { isManager, isVolunteer } = useAuth();
+  const {
+    activeRoute,
+    currentLocation: volunteerLocation,
+    routeInfo,
+  } = useVolunteerRoute();
   const [selectedReportId, setSelectedReportId] = useState(null);
   const [reroutingMissionId, setReroutingMissionId] = useState(null);
   const [activeTab, setActiveTab] = useState("map"); // "map" | "analytics" | "resources"
@@ -68,6 +74,7 @@ function DashboardPage() {
     return () => window.removeEventListener("sos-alert", handleSosAlert);
   }, []);
 
+  // Fetch needs for map (managers see all, volunteers see only their assigned tasks)
   const {
     data: needsData = [],
     isLoading: isNeedsLoading,
@@ -77,6 +84,15 @@ function DashboardPage() {
     queryKey: ["map-needs"],
     queryFn: getNeedsForMap,
     refetchInterval: 10000,
+    enabled: isManager, // Only fetch for managers
+  });
+
+  // Fetch volunteer's assigned tasks (unverified tasks assigned to them)
+  const { data: volunteerTasks = [] } = useQuery({
+    queryKey: ["volunteer-tasks"],
+    queryFn: getUnverifiedTasks,
+    refetchInterval: 10000,
+    enabled: isVolunteer, // Only fetch for volunteers
   });
 
   // Fetch reports
@@ -88,6 +104,7 @@ function DashboardPage() {
     queryKey: ["reports"],
     queryFn: () => getReports({ limit: 50 }),
     refetchInterval: 5000,
+    enabled: isManager, // Only fetch for managers
   });
 
   // Fetch missions (auto-generated routes from logistics agent)
@@ -95,6 +112,7 @@ function DashboardPage() {
     queryKey: ["missions"],
     queryFn: getMissions,
     refetchInterval: 5000,
+    enabled: isManager, // Only fetch for managers
   });
 
   // Extract all routes from missions to display on map
@@ -166,8 +184,33 @@ function DashboardPage() {
     [reportsData]
   );
 
-  // Combine needs and analyzed reports for the map
+  // Convert volunteer tasks to map items (for volunteer mode)
+  const volunteerMapItems = useMemo(() => {
+    return (volunteerTasks || [])
+      .filter(
+        (task) => typeof task.lat === "number" && typeof task.lon === "number"
+      )
+      .map((task) => ({
+        id: task.id,
+        lat: task.lat,
+        lon: task.lon,
+        status: task.status || "Unverified",
+        category: task.needType || "Task",
+        severity: task.urgency || 5,
+        needs: [],
+        text: task.description || task.notes || "Assigned task",
+        isReport: false,
+        isTask: true,
+      }));
+  }, [volunteerTasks]);
+
+  // Combine needs and analyzed reports for the map (manager view)
   const allMapItems = useMemo(() => {
+    // For volunteers, only show their assigned tasks
+    if (isVolunteer) {
+      return volunteerMapItems;
+    }
+    // For managers, show all needs, reports, and SOS alerts
     const reportItems = analyzedReports.map((report) => ({
       id: `report-${report.id}`,
       lat: report.lat,
@@ -180,7 +223,7 @@ function DashboardPage() {
       isReport: true,
     }));
     return [...needs, ...reportItems, ...sosMapItems];
-  }, [needs, analyzedReports, sosMapItems]);
+  }, [needs, analyzedReports, sosMapItems, isVolunteer, volunteerMapItems]);
 
   const handleReportClick = (report) => {
     setSelectedReportId(report.id);
@@ -434,8 +477,12 @@ function DashboardPage() {
                   missionRoutes={missionRoutes}
                   isRerouteMode={!!reroutingMissionId}
                   onStationClick={handleStationClick}
+                  volunteerMode={isVolunteer}
+                  volunteerLocation={volunteerLocation}
+                  volunteerRoute={activeRoute}
+                  isRouteFallback={routeInfo?.isFallback || false}
                 />
-                {(isNeedsLoading || isReportsLoading) && (
+                {(isNeedsLoading || isReportsLoading) && !isVolunteer && (
                   <div className="map-loading-overlay">
                     <div className="spinner"></div>
                     <span>Loading...</span>
@@ -443,67 +490,71 @@ function DashboardPage() {
                 )}
               </main>
 
-              {/* Bottom Panel - Missions & Reports */}
-              <aside
-                className={`panel panel-combined ${isPanelOpen ? "open" : ""}`}
-              >
-                <div
-                  className="panel-toggle-handle"
-                  onClick={() => setIsPanelOpen(!isPanelOpen)}
-                  aria-label="Toggle panel"
+              {/* Bottom Panel - Missions & Reports (Only for managers) */}
+              {isManager && (
+                <aside
+                  className={`panel panel-combined ${
+                    isPanelOpen ? "open" : ""
+                  }`}
                 >
-                  <span className="handle-bar"></span>
-                </div>
-                <div className="panel-tabs">
-                  <button
-                    className={`panel-tab ${
-                      activePanel === "missions" ? "active" : ""
-                    }`}
-                    onClick={() => {
-                      setActivePanel("missions");
-                      setIsPanelOpen(true);
-                    }}
+                  <div
+                    className="panel-toggle-handle"
+                    onClick={() => setIsPanelOpen(!isPanelOpen)}
+                    aria-label="Toggle panel"
                   >
-                    Missions
-                    <span className="tab-badge">
-                      {missionsData?.length || 0}
-                    </span>
-                  </button>
-                  <button
-                    className={`panel-tab ${
-                      activePanel === "reports" ? "active" : ""
-                    }`}
-                    onClick={() => {
-                      setActivePanel("reports");
-                      setIsPanelOpen(true);
-                    }}
-                  >
-                    Reports
-                    <span className="tab-badge">
-                      {unroutedReports?.length || 0}
-                    </span>
-                  </button>
-                </div>
+                    <span className="handle-bar"></span>
+                  </div>
+                  <div className="panel-tabs">
+                    <button
+                      className={`panel-tab ${
+                        activePanel === "missions" ? "active" : ""
+                      }`}
+                      onClick={() => {
+                        setActivePanel("missions");
+                        setIsPanelOpen(true);
+                      }}
+                    >
+                      Missions
+                      <span className="tab-badge">
+                        {missionsData?.length || 0}
+                      </span>
+                    </button>
+                    <button
+                      className={`panel-tab ${
+                        activePanel === "reports" ? "active" : ""
+                      }`}
+                      onClick={() => {
+                        setActivePanel("reports");
+                        setIsPanelOpen(true);
+                      }}
+                    >
+                      Reports
+                      <span className="tab-badge">
+                        {unroutedReports?.length || 0}
+                      </span>
+                    </button>
+                  </div>
 
-                <div className="panel-body">
-                  {activePanel === "missions" ? (
-                    <MissionPanel
-                      missions={missionsData || []}
-                      missionRoutes={missionRoutes}
-                      onCompleteMission={handleCompleteMission}
-                      onStartReroute={handleStartReroute}
-                      reroutingMissionId={reroutingMissionId}
-                      onCancelReroute={handleCancelReroute}
-                    />
-                  ) : (
-                    <ReportsList
-                      reports={unroutedReports}
-                      onReportClick={handleReportClick}
-                      selectedReportId={selectedReportId}
-                    />
-                  )}
-                </div>
-              </aside>
+                  <div className="panel-body">
+                    {activePanel === "missions" ? (
+                      <MissionPanel
+                        missions={missionsData || []}
+                        missionRoutes={missionRoutes}
+                        onCompleteMission={handleCompleteMission}
+                        onStartReroute={handleStartReroute}
+                        reroutingMissionId={reroutingMissionId}
+                        onCancelReroute={handleCancelReroute}
+                      />
+                    ) : (
+                      <ReportsList
+                        reports={unroutedReports}
+                        onReportClick={handleReportClick}
+                        selectedReportId={selectedReportId}
+                      />
+                    )}
+                  </div>
+                </aside>
+              )}
             </div>
           )}
 

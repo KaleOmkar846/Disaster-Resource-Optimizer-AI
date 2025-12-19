@@ -46,11 +46,19 @@
     "taskId": "कार्य आईडी",
     "description": "विवरण",
     "notes": "नोट्स",
+    "location": "स्थान",
     "noDescription": "कोई विवरण नहीं",
     "noNotes": "कोई नोट्स नहीं",
+    "noLocation": "इस कार्य का कोई स्थान नहीं है।",
+    "locationRequired": "रूट शुरू करने के लिए आपका स्थान आवश्यक है। कृपया स्थान सेवाएं सक्षम करें।",
     "verify": "सत्यापित करें",
     "verifying": "सत्यापित हो रहा है...",
-    "pendingSync": "सिंक बाकी है"
+    "pendingSync": "सिंक बाकी है",
+    "startRoute": "रूट शुरू करें",
+    "routeStarted": "रूट सक्रिय",
+    "routeActive": "रूट चालू है",
+    "cancelRoute": "रूट रद्द करें",
+    "calculatingRoute": "गणना हो रही है..."
   },
   "audio": {
     "title": "आवाज रिपोर्ट",

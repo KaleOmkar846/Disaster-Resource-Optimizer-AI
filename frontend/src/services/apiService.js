@@ -488,3 +488,65 @@ export async function getShelterStats() {
     throw error;
   }
 }
+
+// ============================================
+// Route Calculation API
+// ============================================
+
+/**
+ * Calculate a volunteer route from origin to destination
+ * Uses centralized backend routing service (OSRM)
+ * @param {Object} origin - Starting point {lat, lon/lng}
+ * @param {Object} destination - Destination point {lat, lon/lng}
+ * @returns {Promise<Object>} Route data with geometry, distance, duration
+ */
+export async function getVolunteerRoute(origin, destination) {
+  try {
+    const response = await apiClient.post("/routes/volunteer", {
+      origin,
+      destination,
+    });
+    return response.data.data;
+  } catch (error) {
+    console.error("Error calculating volunteer route:", error);
+    throw error;
+  }
+}
+
+/**
+ * Calculate a general route between waypoints
+ * @param {Array} waypoints - Array of {lat, lon} objects
+ * @param {Object} options - Optional configuration {profile, steps}
+ * @returns {Promise<Object>} Route data
+ */
+export async function calculateRoute(waypoints, options = {}) {
+  try {
+    const response = await apiClient.post("/routes/calculate", {
+      waypoints,
+      ...options,
+    });
+    return response.data.data;
+  } catch (error) {
+    console.error("Error calculating route:", error);
+    throw error;
+  }
+}
+
+/**
+ * Calculate an optimized route for multiple stops (TSP)
+ * @param {Array} waypoints - Array of {lat, lon} objects
+ * @param {Object} options - Optional configuration {roundtrip}
+ * @returns {Promise<Object>} Optimized route data with order
+ */
+export async function calculateOptimizedRoute(waypoints, options = {}) {
+  try {
+    const response = await apiClient.post("/routes/optimize", {
+      waypoints,
+      ...options,
+    });
+    return response.data.data;
+  } catch (error) {
+    console.error("Error calculating optimized route:", error);
+    throw error;
+  }
+}

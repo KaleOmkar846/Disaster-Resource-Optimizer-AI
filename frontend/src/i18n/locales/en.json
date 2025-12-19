@@ -46,11 +46,19 @@
     "taskId": "Task ID",
     "description": "Description",
     "notes": "Notes",
+    "location": "Location",
     "noDescription": "No description",
     "noNotes": "No notes",
+    "noLocation": "This task does not have a location.",
+    "locationRequired": "Your location is required to start a route. Please enable location services.",
     "verify": "Verify",
     "verifying": "Verifying...",
-    "pendingSync": "Pending Sync"
+    "pendingSync": "Pending Sync",
+    "startRoute": "Start Route",
+    "routeStarted": "Route Active",
+    "routeActive": "Route in progress",
+    "cancelRoute": "Cancel route",
+    "calculatingRoute": "Calculating..."
   },
   "audio": {
     "title": "Voice Report",
