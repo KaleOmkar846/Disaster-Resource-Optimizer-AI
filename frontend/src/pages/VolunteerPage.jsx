@@ -102,12 +102,12 @@ function MissingPersonReport() {
     return (
       <div className="missing-success">
         <CheckCircle size={48} />
-        <h3>Report Submitted Successfully</h3>
+        <h3>{t("missingPerson.success.title")}</h3>
         <p>
-          Thank you for reporting. Our team will start searching immediately.
+          {t("missingPerson.success.message")}
         </p>
         <button onClick={() => setSuccess(false)} className="btn-primary">
-          Report Another
+          {t("missingPerson.success.button")}
         </button>
       </div>
     );
@@ -118,8 +118,8 @@ function MissingPersonReport() {
       <div className="form-header">
         <Search size={24} />
         <div>
-          <h3>Report Missing Person</h3>
-          <p>Help reunite families by reporting missing persons</p>
+          <h3>{t("missingPerson.form.title")}</h3>
+          <p>{t("missingPerson.form.subtitle")}</p>
         </div>
       </div>
 
@@ -131,11 +131,11 @@ function MissingPersonReport() {
       )}
 
       <div className="form-section">
-        <h4>Person Information</h4>
+        <h4>{t("missingPerson.form.personInfo")}</h4>
 
         <div className="form-group">
           <label>
-            <User size={14} /> Full Name *
+            <User size={14} /> {t("missingPerson.form.fullName")}
           </label>
           <input
             type="text"
@@ -143,60 +143,60 @@ function MissingPersonReport() {
             onChange={(e) =>
               setFormData({ ...formData, fullName: e.target.value })
             }
-            placeholder="Enter the person's full name"
+            placeholder={t("missingPerson.form.fullNamePlaceholder")}
             required
           />
         </div>
 
         <div className="form-row">
           <div className="form-group">
-            <label>Age</label>
+            <label>{t("missingPerson.form.age")}</label>
             <input
               type="number"
               value={formData.age}
               onChange={(e) =>
                 setFormData({ ...formData, age: e.target.value })
               }
-              placeholder="Age"
+              placeholder={t("missingPerson.form.age")}
               min="0"
               max="150"
             />
           </div>
           <div className="form-group">
-            <label>Gender</label>
+            <label>{t("missingPerson.form.gender")}</label>
             <select
               value={formData.gender}
               onChange={(e) =>
                 setFormData({ ...formData, gender: e.target.value })
               }
             >
-              <option value="unknown">Unknown</option>
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-              <option value="other">Other</option>
+              <option value="unknown">{t("gender.unknown")}</option>
+              <option value="male">{t("gender.male")}</option>
+              <option value="female">{t("gender.female")}</option>
+              <option value="other">{t("gender.other")}</option>
             </select>
           </div>
         </div>
 
         <div className="form-group">
-          <label>Description</label>
+          <label>{t("missingPerson.form.description")}</label>
           <textarea
             value={formData.description}
             onChange={(e) =>
               setFormData({ ...formData, description: e.target.value })
             }
-            placeholder="Physical description, clothing, distinguishing features..."
+            placeholder={t("missingPerson.form.descriptionPlaceholder")}
             rows={3}
           />
         </div>
       </div>
 
       <div className="form-section">
-        <h4>Last Seen Location</h4>
+        <h4>{t("missingPerson.form.lastSeenLocation")}</h4>
 
         <div className="form-group">
           <label>
-            <MapPin size={14} /> Location / Address
+            <MapPin size={14} /> {t("missingPerson.form.locationAddress")}
           </label>
           <input
             type="text"
@@ -204,7 +204,7 @@ function MissingPersonReport() {
             onChange={(e) =>
               setFormData({ ...formData, lastSeenAddress: e.target.value })
             }
-            placeholder="Where was the person last seen?"
+            placeholder={t("missingPerson.form.locationPlaceholder")}
           />
         </div>
 
@@ -212,7 +212,7 @@ function MissingPersonReport() {
           <div className="location-detected">
             <MapPin size={14} />
             <span>
-              Your location detected: {currentLocation.lat.toFixed(4)},{" "}
+              {t("missingPerson.form.locationDetected")} {currentLocation.lat.toFixed(4)},{" "}
               {currentLocation.lng.toFixed(4)}
             </span>
           </div>
@@ -220,11 +220,11 @@ function MissingPersonReport() {
       </div>
 
       <div className="form-section">
-        <h4>Your Contact Information</h4>
+        <h4>{t("missingPerson.form.contactInfo")}</h4>
 
         <div className="form-group">
           <label>
-            <User size={14} /> Your Name *
+            <User size={14} /> {t("missingPerson.form.yourName")}
           </label>
           <input
             type="text"
@@ -232,14 +232,14 @@ function MissingPersonReport() {
             onChange={(e) =>
               setFormData({ ...formData, reporterName: e.target.value })
             }
-            placeholder="Your name"
+            placeholder={t("missingPerson.form.yourNamePlaceholder")}
             required
           />
         </div>
 
         <div className="form-group">
           <label>
-            <Phone size={14} /> Phone Number *
+            <Phone size={14} /> {t("missingPerson.form.phoneNumber")}
           </label>
           <input
             type="tel"
@@ -257,12 +257,12 @@ function MissingPersonReport() {
         {submitting ? (
           <>
             <Loader2 size={18} className="spin" />
-            Submitting...
+            {t("common.submitting")}
           </>
         ) : (
           <>
             <Search size={18} />
-            Submit Missing Person Report
+            {t("missingPerson.form.submitButton")}
           </>
         )}
       </button>
@@ -275,10 +275,10 @@ function VolunteerPage() {
   const [viewMode, setViewMode] = useState("tasks"); // 'tasks' | 'voice' | 'photo' | 'missing'
 
   const tabs = [
-    { id: "tasks", icon: ClipboardList, label: "My Tasks" },
-    { id: "voice", icon: Mic, label: "Voice Report" },
-    { id: "photo", icon: Camera, label: "Photo Report" },
-    { id: "missing", icon: Search, label: "Missing Person" },
+    { id: "tasks", icon: ClipboardList, label: t("fieldOperations.tabs.myTasks") },
+    { id: "voice", icon: Mic, label: t("fieldOperations.tabs.voiceReport") },
+    { id: "photo", icon: Camera, label: t("fieldOperations.tabs.photoReport") },
+    { id: "missing", icon: Search, label: t("fieldOperations.tabs.missingPerson") },
   ];
 
   return (
@@ -286,10 +286,10 @@ function VolunteerPage() {
       {/* Simple Header */}
       <header className="field-header">
         <div className="field-header-top">
-          <h1>🚨 Field Operations</h1>
+          <h1>{t("fieldOperations.title")}</h1>
           <NotificationBell />
         </div>
-        <p>Report incidents and manage your assigned tasks</p>
+        <p>{t("fieldOperations.subtitle")}</p>
       </header>
 
       {/* Large, Easy-to-Tap Action Cards */}

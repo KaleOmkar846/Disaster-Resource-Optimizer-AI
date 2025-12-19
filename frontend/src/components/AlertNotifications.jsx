@@ -210,9 +210,9 @@ export default function AlertNotifications({ userId, userArea = null }) {
     const minutes = Math.floor(
       (Date.now() - new Date(timestamp).getTime()) / 60000
     );
-    if (minutes < 1) return "Just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
+    if (minutes < 1) return t("time.justNow");
+    if (minutes < 60) return t("time.minutesAgo", { count: minutes });
+    if (minutes < 1440) return t("time.hoursAgo", { count: Math.floor(minutes / 60) });
     return new Date(timestamp).toLocaleDateString();
   };
 
@@ -222,8 +222,8 @@ export default function AlertNotifications({ userId, userArea = null }) {
       <button
         className={`alert-bell ${unreadCount > 0 ? "has-alerts" : ""}`}
         onClick={() => setShowPanel(!showPanel)}
-        aria-label={`Notifications ${
-          unreadCount > 0 ? `(${unreadCount} unread)` : ""
+        aria-label={`${t("notifications.title")} ${
+          unreadCount > 0 ? `(${unreadCount} ${t("notifications.unread")})` : ""
         }`}
       >
         {notificationsEnabled ? <Bell size={20} /> : <BellOff size={20} />}
@@ -242,12 +242,12 @@ export default function AlertNotifications({ userId, userArea = null }) {
         >
           <div className="alert-panel" onClick={(e) => e.stopPropagation()}>
             <div className="alert-panel-header">
-              <h3>Notifications</h3>
+              <h3>{t("notifications.title")}</h3>
               <div className="alert-panel-actions">
                 <button
                   className="icon-btn"
                   onClick={() => setSoundEnabled(!soundEnabled)}
-                  title={soundEnabled ? "Mute sounds" : "Enable sounds"}
+                  title={soundEnabled ? t("notifications.muteSounds") : t("notifications.enableSounds")}
                 >
                   <Volume2 size={18} className={soundEnabled ? "" : "muted"} />
                 </button>
@@ -256,8 +256,8 @@ export default function AlertNotifications({ userId, userArea = null }) {
                   onClick={() => setNotificationsEnabled(!notificationsEnabled)}
                   title={
                     notificationsEnabled
-                      ? "Disable notifications"
-                      : "Enable notifications"
+                      ? t("notifications.disable")
+                      : t("notifications.enable")
                   }
                 >
                   {notificationsEnabled ? (
@@ -277,7 +277,7 @@ export default function AlertNotifications({ userId, userArea = null }) {
 
             {unreadCount > 0 && (
               <button className="mark-all-read" onClick={markAllAsRead}>
-                Mark all as read
+                {t("notifications.markAllRead")}
               </button>
             )}
 
@@ -285,7 +285,7 @@ export default function AlertNotifications({ userId, userArea = null }) {
               {alerts.length === 0 ? (
                 <div className="alert-empty">
                   <Bell size={32} />
-                  <span>No notifications</span>
+                  <span>{t("notifications.empty")}</span>
                 </div>
               ) : (
                 alerts.map((alert) => {

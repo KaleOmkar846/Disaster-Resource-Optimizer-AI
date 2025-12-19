@@ -53,6 +53,7 @@ function LanguageSwitcher() {
 
 function UserMenu() {
   const { user, logout, isManager } = useAuth();
+  const { t } = useTranslation();
 
   return (
     <div className="user-menu-pill">
@@ -60,9 +61,9 @@ function UserMenu() {
       <span
         className={`user-role-badge ${isManager ? "manager" : "volunteer"}`}
       >
-        {isManager ? "MANAGER" : "VOLUNTEER"}
+        {isManager ? t("roles.manager") : t("roles.volunteer")}
       </span>
-      <button className="logout-icon-btn" onClick={logout} title="Logout">
+      <button className="logout-icon-btn" onClick={logout} title={t("auth.logout")}>
         <LogOut size={16} />
       </button>
     </div>
@@ -83,7 +84,7 @@ function AuthenticatedApp() {
               <div className="brand-logo">
                 <span className="brand-dot" />
               </div>
-              <span className="brand-text">FieldPulse</span>
+              <span className="brand-text">{t("app.brand")}</span>
             </Link>
 
             <nav className="header-nav">
@@ -93,7 +94,7 @@ function AuthenticatedApp() {
                   `nav-link ${isActive ? "active" : ""}`
                 }
               >
-                Command Center
+                {t("nav.commandCenter")}
               </NavLink>
               <NavLink
                 to="/tasks"
@@ -101,7 +102,7 @@ function AuthenticatedApp() {
                   `nav-link ${isActive ? "active" : ""}`
                 }
               >
-                Field Tasks
+                {t("nav.fieldTasks")}
               </NavLink>
             </nav>
 
@@ -135,12 +136,13 @@ function AuthenticatedApp() {
 
 function App() {
   const { isAuthenticated, loading } = useAuth();
+  const { t } = useTranslation();
 
   if (loading) {
     return (
       <div className="app-loading">
         <div className="loading-spinner" />
-        <p>Loading...</p>
+        <p>{t("common.loading")}</p>
       </div>
     );
   }

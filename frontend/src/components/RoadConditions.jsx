@@ -128,7 +128,7 @@ const RoadConditionCard = ({ condition, onVerify, onResolve }) => {
               className="btn-verify"
               onClick={(e) => {
                 e.stopPropagation();
-                onVerify(condition._id);
+                onVerify(condition.conditionId || condition._id);
               }}
             >
               <CheckCircle size={14} />
@@ -138,7 +138,7 @@ const RoadConditionCard = ({ condition, onVerify, onResolve }) => {
               className="btn-resolve"
               onClick={(e) => {
                 e.stopPropagation();
-                onResolve(condition._id);
+                onResolve(condition.conditionId || condition._id);
               }}
             >
               <Navigation size={14} />
@@ -167,11 +167,14 @@ const ReportConditionForm = ({ onSubmit, onCancel, currentLocation }) => {
       conditionType: formData.conditionType,
       severity: formData.severity,
       description: formData.description,
+      // Backend expects simple lat/lng fields, not GeoJSON
       startPoint: {
-        type: "Point",
-        coordinates: currentLocation
-          ? [currentLocation.lng, currentLocation.lat]
-          : [0, 0],
+        lat: currentLocation?.lat ?? 0,
+        lng: currentLocation?.lng ?? 0,
+      },
+      endPoint: {
+        lat: currentLocation?.lat ?? 0,
+        lng: currentLocation?.lng ?? 0,
       },
     };
 
@@ -349,7 +352,7 @@ export default function RoadConditions({ currentLocation, onConditionClick }) {
       )}
 
       <div className="filter-tabs">
-        {["all", "active", "verified", "resolved"].map((f) => (
+        {["all", "active", "verified", "cleared"].map((f) => (
           <button
             key={f}
             className={`filter-tab ${filter === f ? "active" : ""}`}
@@ -375,7 +378,7 @@ export default function RoadConditions({ currentLocation, onConditionClick }) {
         ) : (
           conditions.map((condition) => (
             <RoadConditionCard
-              key={condition._id}
+              key={condition.conditionId || condition._id}
               condition={condition}
               onVerify={(id) => verifyMutation.mutate(id)}
               onResolve={(id) => resolveMutation.mutate(id)}
