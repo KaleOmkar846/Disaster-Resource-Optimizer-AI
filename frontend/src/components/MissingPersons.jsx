@@ -24,12 +24,126 @@ import {
 import { missingPersonsAPI } from "../services/apiService";
 import "./MissingPersons.css";
 
-const StatusBadge = ({ status }) => {
+const PersonDetailModal = ({ person, onClose, onMarkFound }) => {
+  const { t } = useTranslation();
+
+  if (!person) return null;
+
+  const timeAgo = (date) => {
+    const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor(seconds / 3600);
+
+    if (days > 0)
+      return t("reports.daysAgo", {
+        count: days,
+        defaultValue: `${days} day${days > 1 ? "s" : ""} ago`,
+      });
+    if (hours > 0)
+      return t("reports.hoursAgo", {
+        count: hours,
+        defaultValue: `${hours} hour${hours > 1 ? "s" : ""} ago`,
+      });
+    return t("reports.justNow");
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>{person.fullName}</h3>
+          <button className="modal-close-btn" onClick={onClose}>
+            <X size={20} />
+          </button>
+        </div>
+        <div className="modal-body">
+          {person.photos && person.photos.length > 0 && (
+            <div className="modal-photo">
+              <img src={person.photos[0].url || person.photos[0]} alt={person.fullName} />
+            </div>
+          )}
+          <div className="modal-details">
+            <div className="detail-row">
+              <strong>{t("family.status")}:</strong>
+              <StatusBadge status={person.status} t={t} />
+            </div>
+            <div className="detail-row">
+              <strong>{t("family.age")}:</strong>
+              <span>{person.age} {t("missingPerson.years")}</span>
+            </div>
+            <div className="detail-row">
+              <strong>{t("family.gender")}:</strong>
+              <span className="capitalize">{person.gender}</span>
+            </div>
+            <div className="detail-row">
+              <strong>{t("family.lastSeenLocation")}:</strong>
+              <span>{person.lastSeenLocation?.address || t("tasks.noLocation")}</span>
+            </div>
+            <div className="detail-row">
+              <strong>{t("family.reported")}:</strong>
+              <span>{timeAgo(person.createdAt)}</span>
+            </div>
+            {person.description && (
+              <div className="detail-row">
+                <strong>{t("family.description")}:</strong>
+                <p>{typeof person.description === "string" ? person.description : person.description.physical || ""}</p>
+              </div>
+            )}
+            {person.medicalInfo && (
+              <div className="detail-row alert">
+                <strong>{t("family.medicalInfo")}:</strong>
+                <p>{person.medicalInfo}</p>
+              </div>
+            )}
+            {person.reporterInfo && (
+              <div className="detail-row">
+                <strong>{t("family.contact")}:</strong>
+                <span>{person.reporterInfo.phone || t("family.noPhone")}</span>
+              </div>
+            )}
+          </div>
+          {person.status === "missing" && (
+            <div className="modal-actions">
+              <button
+                className="btn-found"
+                onClick={() => {
+                  onMarkFound(person._id);
+                  onClose();
+                }}
+              >
+                <CheckCircle size={16} />
+                {t("family.markFound")}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const StatusBadge = ({ status, t }) => {
   const statusConfig = {
-    missing: { color: "status-missing", icon: AlertCircle, label: "Missing" },
-    found: { color: "status-found", icon: CheckCircle, label: "Found" },
-    reunited: { color: "status-reunited", icon: Heart, label: "Reunited" },
-    searching: { color: "status-searching", icon: Search, label: "Searching" },
+    missing: {
+      color: "status-missing",
+      icon: AlertCircle,
+      key: "family.statusMissing",
+    },
+    found: {
+      color: "status-found",
+      icon: CheckCircle,
+      key: "family.statusFound",
+    },
+    reunited: {
+      color: "status-reunited",
+      icon: Heart,
+      key: "family.statusReunited",
+    },
+    searching: {
+      color: "status-searching",
+      icon: Search,
+      key: "family.statusSearching",
+    },
   };
 
   const config = statusConfig[status] || statusConfig.missing;
@@ -38,7 +152,7 @@ const StatusBadge = ({ status }) => {
   return (
     <span className={`status-badge ${config.color}`}>
       <Icon size={12} />
-      {config.label}
+      {t(config.key)}
     </span>
   );
 };
@@ -47,14 +161,48 @@ const PersonCard = ({ person, onView, onMarkFound }) => {
   const [expanded, setExpanded] = useState(false);
   const { t } = useTranslation();
 
+  const handleShare = async () => {
+    const shareText = `${t("family.missing")}: ${person.fullName}, ${person.age} ${t("missingPerson.years")}, ${person.gender}. ${t("family.lastSeenLocation")}: ${person.lastSeenLocation?.address || t("tasks.noLocation")}. ${t("family.contact")}: ${person.reporterInfo?.phone || ""}`;
+    const shareUrl = window.location.href;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${t("family.missing")}: ${person.fullName}`,
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          console.error("Share failed:", err);
+        }
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+        alert(t("family.copiedToClipboard") || "Copied to clipboard!");
+      } catch (err) {
+        console.error("Clipboard copy failed:", err);
+      }
+    }
+  };
+
   const timeAgo = (date) => {
     const seconds = Math.floor((new Date() - new Date(date)) / 1000);
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor(seconds / 3600);
 
-    if (days > 0) return `${days} day${days > 1 ? "s" : ""} ago`;
-    if (hours > 0) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
-    return "Recently";
+    if (days > 0)
+      return t("reports.daysAgo", {
+        count: days,
+        defaultValue: `${days} day${days > 1 ? "s" : ""} ago`,
+      });
+    if (hours > 0)
+      return t("reports.hoursAgo", {
+        count: hours,
+        defaultValue: `${hours} hour${hours > 1 ? "s" : ""} ago`,
+      });
+    return t("reports.justNow");
   };
 
   return (
@@ -65,7 +213,10 @@ const PersonCard = ({ person, onView, onMarkFound }) => {
       <div className="person-card-content">
         <div className="person-photo-wrapper">
           {person.photos && person.photos.length > 0 ? (
-            <img src={person.photos[0]} alt={person.fullName} />
+            <img
+              src={person.photos[0].url || person.photos[0]}
+              alt={person.fullName}
+            />
           ) : (
             <User size={24} />
           )}
@@ -74,11 +225,13 @@ const PersonCard = ({ person, onView, onMarkFound }) => {
         <div className="person-info-main">
           <div className="person-header-row">
             <h4 className="person-name">{person.fullName}</h4>
-            <StatusBadge status={person.status} />
+            <StatusBadge status={person.status} t={t} />
           </div>
 
           <div className="person-demographics">
-            <span>{person.age} yrs</span>
+            <span>
+              {person.age} {t("missingPerson.years", "yrs")}
+            </span>
             <span className="separator">•</span>
             <span className="capitalize">{person.gender}</span>
           </div>
@@ -86,7 +239,8 @@ const PersonCard = ({ person, onView, onMarkFound }) => {
           <div className="person-location-row">
             <MapPin size={14} />
             <span className="location-text">
-              {person.lastSeenLocation?.address || "Unknown location"}
+              {person.lastSeenLocation?.address ||
+                t("tasks.noLocation", "Unknown location")}
             </span>
           </div>
         </div>
@@ -96,7 +250,7 @@ const PersonCard = ({ person, onView, onMarkFound }) => {
         <div className="person-body">
           <div className="person-details-grid">
             <div className="detail-item">
-              <span className="detail-label">Reported</span>
+              <span className="detail-label">{t("family.reported")}</span>
               <div className="detail-value">
                 <Clock size={14} />
                 <span>{timeAgo(person.createdAt)}</span>
@@ -105,25 +259,29 @@ const PersonCard = ({ person, onView, onMarkFound }) => {
 
             {person.description && (
               <div className="detail-item full-width">
-                <span className="detail-label">Description</span>
-                <p className="detail-text">{person.description}</p>
+                <span className="detail-label">{t("family.description")}</span>
+                <p className="detail-text">
+                  {typeof person.description === "string"
+                    ? person.description
+                    : person.description.physical || ""}
+                </p>
               </div>
             )}
 
             {person.medicalInfo && (
               <div className="detail-item full-width alert">
-                <span className="detail-label">Medical Info</span>
+                <span className="detail-label">{t("family.medicalInfo")}</span>
                 <p className="detail-text">{person.medicalInfo}</p>
               </div>
             )}
 
             {person.reporterInfo && (
               <div className="detail-item full-width">
-                <span className="detail-label">Contact</span>
+                <span className="detail-label">{t("family.contact")}</span>
                 <div className="detail-value">
                   <Phone size={14} />
                   <span>
-                    {person.reporterInfo.phone || "No phone provided"}
+                    {person.reporterInfo.phone || t("family.noPhone")}
                   </span>
                 </div>
               </div>
@@ -135,7 +293,7 @@ const PersonCard = ({ person, onView, onMarkFound }) => {
               {person.photos.map((photo, index) => (
                 <img
                   key={index}
-                  src={photo}
+                  src={photo.url || photo}
                   alt={`${person.fullName} ${index + 1}`}
                 />
               ))}
@@ -151,16 +309,17 @@ const PersonCard = ({ person, onView, onMarkFound }) => {
               }}
             >
               <Eye size={14} />
-              Details
+              {t("family.details")}
             </button>
             <button
               className="btn-share"
               onClick={(e) => {
                 e.stopPropagation();
+                handleShare();
               }}
             >
               <Share2 size={14} />
-              Share
+              {t("family.share")}
             </button>
             {person.status === "missing" && (
               <button
@@ -171,7 +330,7 @@ const PersonCard = ({ person, onView, onMarkFound }) => {
                 }}
               >
                 <CheckCircle size={14} />
-                Found
+                {t("family.markFound")}
               </button>
             )}
           </div>
@@ -194,40 +353,69 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
     reporterPhone: "",
     relationship: "",
   });
-  const [photos, setPhotos] = useState([]);
+  const [photos, setPhotos] = useState([]); // Stores { file, preview } objects
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handlePhotoChange = (e) => {
     const files = Array.from(e.target.files);
-    const previews = files.map((file) => URL.createObjectURL(file));
-    setPhotos([...photos, ...previews]);
+    const newPhotos = files.map((file) => ({
+      file,
+      preview: URL.createObjectURL(file),
+    }));
+    setPhotos([...photos, ...newPhotos]);
   };
 
-  const handleSubmit = (e) => {
+  const removePhoto = (index) => {
+    // Revoke object URL to prevent memory leak
+    URL.revokeObjectURL(photos[index].preview);
+    setPhotos(photos.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
 
-    const report = {
-      fullName: formData.fullName,
-      age: parseInt(formData.age) || 0,
-      gender: formData.gender,
-      description: formData.description,
-      medicalInfo: formData.medicalInfo,
-      lastSeenLocation: {
-        address: formData.lastSeenAddress,
-        point: currentLocation
-          ? {
-              type: "Point",
-              coordinates: [currentLocation.lng, currentLocation.lat],
-            }
-          : undefined,
-      },
-      reporterInfo: {
-        name: formData.reporterName,
-        phone: formData.reporterPhone,
-        relationship: formData.relationship,
-      },
-    };
+    try {
+      // Create FormData for multipart upload
+      const submitData = new FormData();
 
-    onSubmit(report);
+      // Prepare the data object
+      const reportData = {
+        fullName: formData.fullName,
+        age: parseInt(formData.age) || 0,
+        gender: formData.gender,
+        description: formData.description,
+        medicalInfo: formData.medicalInfo,
+        lastSeenLocation: {
+          address: formData.lastSeenAddress,
+          point: currentLocation
+            ? {
+                type: "Point",
+                coordinates: [currentLocation.lng, currentLocation.lat],
+              }
+            : undefined,
+        },
+        reporterInfo: {
+          name: formData.reporterName,
+          phone: formData.reporterPhone,
+          relationship: formData.relationship,
+        },
+      };
+
+      // Add data as JSON string
+      submitData.append("data", JSON.stringify(reportData));
+
+      // Add photo file if exists (only first photo for now)
+      if (photos.length > 0 && photos[0].file) {
+        submitData.append("photo", photos[0].file);
+      }
+
+      await onSubmit(submitData);
+    } catch (error) {
+      console.error("Form submission error:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -241,8 +429,8 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
           <div className="form-header-icon">
             <Search size={28} />
           </div>
-          <h2>Report Missing Person</h2>
-          <p>Help reunite families by reporting missing persons</p>
+          <h2>{t("family.reportMissing")}</h2>
+          <p>{t("family.reportMissingHint")}</p>
         </div>
       </div>
 
@@ -251,14 +439,14 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
         <div className="form-card">
           <div className="form-card-header">
             <User size={18} />
-            <span>Person Information</span>
+            <span>{t("family.personInfo")}</span>
           </div>
 
           <div className="form-card-body">
             <div className="input-group">
               <label className="input-label">
                 <User size={14} />
-                Full Name <span className="required">*</span>
+                {t("family.fullName")} <span className="required">*</span>
               </label>
               <input
                 type="text"
@@ -267,14 +455,14 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
                 onChange={(e) =>
                   setFormData({ ...formData, fullName: e.target.value })
                 }
-                placeholder="Enter the person's full name"
+                placeholder={t("family.fullNamePlaceholder")}
                 required
               />
             </div>
 
             <div className="input-row">
               <div className="input-group">
-                <label className="input-label">Age</label>
+                <label className="input-label">{t("family.age")}</label>
                 <input
                   type="number"
                   className="form-input"
@@ -282,14 +470,14 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
                   onChange={(e) =>
                     setFormData({ ...formData, age: e.target.value })
                   }
-                  placeholder="Age"
+                  placeholder={t("family.age")}
                   min="0"
                   max="150"
                 />
               </div>
 
               <div className="input-group">
-                <label className="input-label">Gender</label>
+                <label className="input-label">{t("family.gender")}</label>
                 <select
                   className="form-input form-select"
                   value={formData.gender}
@@ -297,10 +485,10 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
                     setFormData({ ...formData, gender: e.target.value })
                   }
                 >
-                  <option value="unknown">Unknown</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
+                  <option value="unknown">{t("family.genderUnknown")}</option>
+                  <option value="male">{t("family.genderMale")}</option>
+                  <option value="female">{t("family.genderFemale")}</option>
+                  <option value="other">{t("family.genderOther")}</option>
                 </select>
               </div>
             </div>
@@ -308,7 +496,7 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
             <div className="input-group">
               <label className="input-label">
                 <FileText size={14} />
-                Description
+                {t("family.description")}
               </label>
               <textarea
                 className="form-input form-textarea"
@@ -316,7 +504,7 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
                 onChange={(e) =>
                   setFormData({ ...formData, description: e.target.value })
                 }
-                placeholder="Physical description, clothing, distinguishing features..."
+                placeholder={t("family.descriptionPlaceholder")}
                 rows={3}
               />
             </div>
@@ -324,7 +512,7 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
             <div className="input-group">
               <label className="input-label">
                 <AlertCircle size={14} />
-                Medical Information
+                {t("family.medicalInfo")}
               </label>
               <textarea
                 className="form-input form-textarea"
@@ -332,7 +520,7 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
                 onChange={(e) =>
                   setFormData({ ...formData, medicalInfo: e.target.value })
                 }
-                placeholder="Medical conditions, medications, special needs..."
+                placeholder={t("family.medicalPlaceholder")}
                 rows={2}
               />
             </div>
@@ -343,14 +531,14 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
         <div className="form-card">
           <div className="form-card-header">
             <MapPin size={18} />
-            <span>Last Seen Location</span>
+            <span>{t("family.lastSeenLocation")}</span>
           </div>
 
           <div className="form-card-body">
             <div className="input-group">
               <label className="input-label">
                 <MapPin size={14} />
-                Location / Address
+                {t("family.locationAddress")}
               </label>
               <textarea
                 className="form-input form-textarea"
@@ -358,7 +546,7 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
                 onChange={(e) =>
                   setFormData({ ...formData, lastSeenAddress: e.target.value })
                 }
-                placeholder="Where was the person last seen?"
+                placeholder={t("family.locationPlaceholder")}
                 rows={2}
               />
             </div>
@@ -367,7 +555,8 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
               <div className="location-detected">
                 <MapPin size={14} />
                 <span>
-                  Your location detected: {currentLocation.lat.toFixed(4)},{" "}
+                  {t("family.locationDetected")}:{" "}
+                  {currentLocation.lat.toFixed(4)},{" "}
                   {currentLocation.lng.toFixed(4)}
                 </span>
               </div>
@@ -379,8 +568,8 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
         <div className="form-card">
           <div className="form-card-header">
             <Camera size={18} />
-            <span>Photos</span>
-            <span className="optional-badge">Optional</span>
+            <span>{t("family.photos")}</span>
+            <span className="optional-badge">{t("family.optional")}</span>
           </div>
 
           <div className="form-card-body">
@@ -395,10 +584,8 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
               />
               <label htmlFor="missing-photo-input" className="photo-upload-btn">
                 <Camera size={24} />
-                <span>Add Photos</span>
-                <span className="upload-hint">
-                  Upload recent photos to help identify
-                </span>
+                <span>{t("family.addPhotos")}</span>
+                <span className="upload-hint">{t("family.uploadHint")}</span>
               </label>
             </div>
 
@@ -406,13 +593,11 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
               <div className="photo-preview-grid">
                 {photos.map((photo, index) => (
                   <div key={index} className="photo-preview-item">
-                    <img src={photo} alt={`Preview ${index + 1}`} />
+                    <img src={photo.preview} alt={`Preview ${index + 1}`} />
                     <button
                       type="button"
                       className="photo-remove-btn"
-                      onClick={() =>
-                        setPhotos(photos.filter((_, i) => i !== index))
-                      }
+                      onClick={() => removePhoto(index)}
                     >
                       <X size={14} />
                     </button>
@@ -427,14 +612,14 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
         <div className="form-card">
           <div className="form-card-header">
             <Phone size={18} />
-            <span>Your Contact Information</span>
+            <span>{t("family.yourContact")}</span>
           </div>
 
           <div className="form-card-body">
             <div className="input-group">
               <label className="input-label">
                 <User size={14} />
-                Your Name <span className="required">*</span>
+                {t("family.yourName")} <span className="required">*</span>
               </label>
               <input
                 type="text"
@@ -443,14 +628,14 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
                 onChange={(e) =>
                   setFormData({ ...formData, reporterName: e.target.value })
                 }
-                placeholder="Your name"
+                placeholder={t("family.yourName")}
               />
             </div>
 
             <div className="input-group">
               <label className="input-label">
                 <Phone size={14} />
-                Phone Number <span className="required">*</span>
+                {t("family.phoneNumber")} <span className="required">*</span>
               </label>
               <input
                 type="tel"
@@ -459,12 +644,12 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
                 onChange={(e) =>
                   setFormData({ ...formData, reporterPhone: e.target.value })
                 }
-                placeholder="+1 234 567 8900"
+                placeholder="+91 98765 43210"
               />
             </div>
 
             <div className="input-group">
-              <label className="input-label">Relationship to Person</label>
+              <label className="input-label">{t("family.relationship")}</label>
               <input
                 type="text"
                 className="form-input"
@@ -472,7 +657,7 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
                 onChange={(e) =>
                   setFormData({ ...formData, relationship: e.target.value })
                 }
-                placeholder="Family member, friend, witness, etc."
+                placeholder={t("family.relationshipPlaceholder")}
               />
             </div>
           </div>
@@ -482,10 +667,19 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
         <button
           type="submit"
           className="submit-report-btn"
-          disabled={!formData.fullName}
+          disabled={!formData.fullName || isSubmitting}
         >
-          <Search size={20} />
-          Submit Missing Person Report
+          {isSubmitting ? (
+            <>
+              <RefreshCw size={20} className="spin" />
+              {t("family.submitting", "Submitting...")}
+            </>
+          ) : (
+            <>
+              <Search size={20} />
+              {t("family.submitReport")}
+            </>
+          )}
         </button>
       </form>
     </div>
@@ -527,9 +721,18 @@ export default function MissingPersons({ currentLocation }) {
 
   // Update status mutation
   const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }) => missingPersonsAPI.updateStatus(id, status),
-    onSuccess: () => {
+    mutationFn: ({ id, status }) => {
+      console.log("Marking person as found:", id, status);
+      return missingPersonsAPI.updateStatus(id, status);
+    },
+    onSuccess: (data) => {
+      console.log("Successfully marked as found:", data);
       queryClient.invalidateQueries(["missingPersons"]);
+      alert(t("family.markedAsFound") || "Person marked as found!");
+    },
+    onError: (error) => {
+      console.error("Error marking as found:", error);
+      alert(t("family.errorMarkingFound") || `Error: ${error.message || "Failed to mark as found"}`);
     },
   });
 
@@ -538,6 +741,11 @@ export default function MissingPersons({ currentLocation }) {
   };
 
   const handleMarkFound = (id) => {
+    if (!id) {
+      console.error("No ID provided to handleMarkFound");
+      return;
+    }
+    console.log("handleMarkFound called with id:", id);
     updateStatusMutation.mutate({ id, status: "found" });
   };
 
@@ -549,16 +757,18 @@ export default function MissingPersons({ currentLocation }) {
       <div className="panel-header">
         <div className="header-title">
           <Users size={20} />
-          <h3>Family Reunification</h3>
+          <h3>{t("family.title")}</h3>
           {missingCount > 0 && (
-            <span className="missing-count">{missingCount} missing</span>
+            <span className="missing-count">
+              {missingCount} {t("family.filterMissing").toLowerCase()}
+            </span>
           )}
         </div>
         <div className="header-actions">
           <button
             className="btn-refresh"
             onClick={() => refetch()}
-            title="Refresh"
+            title={t("resources.refresh")}
           >
             <RefreshCw size={16} />
           </button>
@@ -567,7 +777,7 @@ export default function MissingPersons({ currentLocation }) {
             onClick={() => setShowReportForm(!showReportForm)}
           >
             {showReportForm ? <X size={16} /> : <Plus size={16} />}
-            {showReportForm ? "Cancel" : "Report Missing"}
+            {showReportForm ? t("common.cancel") : t("family.reportMissing")}
           </button>
         </div>
       </div>
@@ -584,7 +794,7 @@ export default function MissingPersons({ currentLocation }) {
             <Search size={16} />
             <input
               type="text"
-              placeholder="Search by name..."
+              placeholder={t("family.searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -605,7 +815,7 @@ export default function MissingPersons({ currentLocation }) {
                 className={`filter-tab ${filter === f ? "active" : ""}`}
                 onClick={() => setFilter(f)}
               >
-                {f.charAt(0).toUpperCase() + f.slice(1)}
+                {t(`family.filter${f.charAt(0).toUpperCase() + f.slice(1)}`)}
               </button>
             ))}
           </div>
@@ -614,16 +824,16 @@ export default function MissingPersons({ currentLocation }) {
             {isLoading ? (
               <div className="loading-state">
                 <RefreshCw className="spin" size={20} />
-                <span>Loading registry...</span>
+                <span>{t("family.loading")}</span>
               </div>
             ) : persons?.length === 0 ? (
               <div className="empty-state">
                 <Heart size={32} />
-                <p>No reports found</p>
+                <p>{t("family.noReports")}</p>
                 <span>
                   {searchQuery
-                    ? "Try a different search term"
-                    : "Report missing persons to help reunite families"}
+                    ? t("family.tryDifferentSearch")
+                    : t("family.noReportsHint")}
                 </span>
               </div>
             ) : (
@@ -638,6 +848,14 @@ export default function MissingPersons({ currentLocation }) {
             )}
           </div>
         </>
+      )}
+
+      {selectedPerson && (
+        <PersonDetailModal
+          person={selectedPerson}
+          onClose={() => setSelectedPerson(null)}
+          onMarkFound={handleMarkFound}
+        />
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext } from "react";
 import { useTranslation } from "react-i18next";
-import { Eye, Type, Zap, Monitor, Settings, X, Check } from "lucide-react";
+import { Sun, Moon, Globe, Settings, X, RotateCcw } from "lucide-react";
+import { languages } from "../i18n";
 import "./AccessibilitySettings.css";
 
 // Accessibility Context
@@ -24,10 +25,7 @@ export function AccessibilityProvider({ children }) {
     return saved
       ? JSON.parse(saved)
       : {
-          highContrast: false,
-          largeText: false,
-          reduceMotion: false,
-          screenReaderMode: false,
+          darkMode: true,
         };
   });
 
@@ -35,47 +33,18 @@ export function AccessibilityProvider({ children }) {
   useEffect(() => {
     const root = document.documentElement;
 
-    // High contrast
-    root.classList.toggle("high-contrast", settings.highContrast);
-
-    // Large text
-    root.classList.toggle("large-text", settings.largeText);
-
-    // Reduce motion
-    root.classList.toggle("reduce-motion", settings.reduceMotion);
-
-    // Screen reader mode
-    root.classList.toggle("screen-reader-mode", settings.screenReaderMode);
+    // Dark/Light mode
+    if (settings.darkMode) {
+      root.classList.add("dark-mode");
+      root.classList.remove("light-mode");
+    } else {
+      root.classList.add("light-mode");
+      root.classList.remove("dark-mode");
+    }
 
     // Persist settings
     localStorage.setItem("accessibilitySettings", JSON.stringify(settings));
   }, [settings]);
-
-  // Listen for system preference changes
-  useEffect(() => {
-    const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const contrastQuery = window.matchMedia("(prefers-contrast: high)");
-
-    const handleMotionChange = (e) => {
-      if (e.matches && !settings.reduceMotion) {
-        setSettings((prev) => ({ ...prev, reduceMotion: true }));
-      }
-    };
-
-    const handleContrastChange = (e) => {
-      if (e.matches && !settings.highContrast) {
-        setSettings((prev) => ({ ...prev, highContrast: true }));
-      }
-    };
-
-    motionQuery.addEventListener("change", handleMotionChange);
-    contrastQuery.addEventListener("change", handleContrastChange);
-
-    return () => {
-      motionQuery.removeEventListener("change", handleMotionChange);
-      contrastQuery.removeEventListener("change", handleContrastChange);
-    };
-  }, [settings.reduceMotion, settings.highContrast]);
 
   const toggleSetting = (key) => {
     setSettings((prev) => ({
@@ -86,10 +55,7 @@ export function AccessibilityProvider({ children }) {
 
   const resetSettings = () => {
     setSettings({
-      highContrast: false,
-      largeText: false,
-      reduceMotion: false,
-      screenReaderMode: false,
+      darkMode: true,
     });
   };
 
@@ -104,96 +70,86 @@ export function AccessibilityProvider({ children }) {
 
 // Accessibility Settings Panel
 export default function AccessibilitySettings({ isOpen, onClose }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { settings, toggleSetting, resetSettings } = useAccessibility();
 
   if (!isOpen) return null;
 
-  const accessibilityOptions = [
-    {
-      key: "highContrast",
-      icon: Eye,
-      label: t("accessibility.highContrast"),
-      description: "Increase contrast for better visibility",
-    },
-    {
-      key: "largeText",
-      icon: Type,
-      label: t("accessibility.largeText"),
-      description: "Increase text size throughout the app",
-    },
-    {
-      key: "reduceMotion",
-      icon: Zap,
-      label: t("accessibility.reduceMotion"),
-      description: "Minimize animations and transitions",
-    },
-    {
-      key: "screenReaderMode",
-      icon: Monitor,
-      label: t("accessibility.screenReaderMode"),
-      description: "Optimize for screen readers",
-    },
-  ];
+  const handleLanguageChange = (langCode) => {
+    i18n.changeLanguage(langCode);
+  };
+
+  const currentLang =
+    languages.find((l) => l.code === i18n.language) || languages[0];
 
   return (
     <div
-      className="accessibility-overlay"
+      className="settings-overlay"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label="Accessibility Settings"
+      aria-label="Settings"
     >
-      <div className="accessibility-panel" onClick={(e) => e.stopPropagation()}>
-        <div className="accessibility-header">
-          <div className="accessibility-title">
-            <Settings size={20} aria-hidden="true" />
-            <h2>Accessibility Settings</h2>
-          </div>
+      <div className="settings-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="settings-header">
+          <h2>
+            <Settings size={18} /> {t("settings.title")}
+          </h2>
           <button
-            className="accessibility-close"
+            className="settings-close"
             onClick={onClose}
-            aria-label="Close accessibility settings"
+            aria-label={t("common.close")}
           >
             <X size={20} />
           </button>
         </div>
 
-        <div className="accessibility-options">
-          {accessibilityOptions.map((option) => (
-            <button
-              key={option.key}
-              className={`accessibility-option ${
-                settings[option.key] ? "active" : ""
-              }`}
-              onClick={() => toggleSetting(option.key)}
-              aria-pressed={settings[option.key]}
-            >
-              <div className="option-icon">
-                <option.icon size={24} aria-hidden="true" />
-              </div>
-              <div className="option-content">
-                <span className="option-label">{option.label}</span>
-                <span className="option-description">{option.description}</span>
-              </div>
-              <div className="option-toggle">
-                {settings[option.key] ? (
-                  <Check size={18} className="toggle-check" />
-                ) : (
-                  <div className="toggle-circle" />
-                )}
-              </div>
-            </button>
-          ))}
-        </div>
+        <div className="settings-content">
+          {/* Language Section - Mobile Only */}
+          <div className="settings-section language-section">
+            <label className="settings-label">
+              <Globe size={16} />
+              {t("settings.language")}
+            </label>
+            <div className="language-options">
+              {languages.map((lang) => (
+                <button
+                  key={lang.code}
+                  className={`lang-btn ${
+                    i18n.language === lang.code ? "active" : ""
+                  }`}
+                  onClick={() => handleLanguageChange(lang.code)}
+                >
+                  {lang.nativeName}
+                </button>
+              ))}
+            </div>
+          </div>
 
-        <div className="accessibility-footer">
-          <button
-            className="reset-button"
-            onClick={resetSettings}
-            aria-label="Reset all accessibility settings to default"
-          >
-            Reset to Default
+          {/* Display Settings */}
+          <div className="settings-section">
+            <label className="settings-label">{t("settings.display")}</label>
+
+            <div className="setting-item">
+              <div className="setting-info">
+                {settings.darkMode ? <Moon size={18} /> : <Sun size={18} />}
+                <span>{settings.darkMode ? t("settings.darkMode") : t("settings.lightMode")}</span>
+              </div>
+              <button
+                className={`toggle ${settings.darkMode ? "on" : ""}`}
+                onClick={() => toggleSetting("darkMode")}
+                aria-pressed={settings.darkMode}
+                role="switch"
+              >
+                <span className="toggle-thumb" />
+              </button>
+            </div>
+          </div>
+
+          {/* Reset */}
+          <button className="reset-btn" onClick={resetSettings}>
+            <RotateCcw size={14} />
+            {t("settings.reset")}
           </button>
         </div>
       </div>
@@ -203,12 +159,13 @@ export default function AccessibilitySettings({ isOpen, onClose }) {
 
 // Accessibility Toggle Button (for header/nav)
 export function AccessibilityToggle({ onClick }) {
+  const { t } = useTranslation();
   return (
     <button
       className="accessibility-toggle"
       onClick={onClick}
-      aria-label="Open accessibility settings"
-      title="Accessibility Settings"
+      aria-label={t("settings.title")}
+      title={t("settings.title")}
     >
       <Settings size={20} aria-hidden="true" />
     </button>
@@ -217,9 +174,10 @@ export function AccessibilityToggle({ onClick }) {
 
 // Skip to main content link (for keyboard navigation)
 export function SkipToContent() {
+  const { t } = useTranslation();
   return (
     <a href="#main-content" className="skip-to-content">
-      Skip to main content
+      {t("common.skipToContent")}
     </a>
   );
 }

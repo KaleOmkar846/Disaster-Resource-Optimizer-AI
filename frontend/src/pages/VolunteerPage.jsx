@@ -11,13 +11,13 @@ import {
   AlertCircle,
   CheckCircle,
   Loader2,
+  X,
 } from "lucide-react";
 import {
   AudioReporter,
   PhotoReporter,
   VolunteerTaskList,
   FloatingSOSButton,
-  NotificationBell,
 } from "../components";
 import { missingPersonsAPI } from "../services/apiService";
 import "./VolunteerPage.css";
@@ -38,6 +38,7 @@ function MissingPersonReport() {
     reporterName: "",
     reporterPhone: "",
   });
+  const [photos, setPhotos] = useState([]);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -52,12 +53,29 @@ function MissingPersonReport() {
     }
   }, []);
 
+  const handlePhotoChange = (e) => {
+    const files = Array.from(e.target.files);
+    const newPhotos = files.map((file) => ({
+      file,
+      preview: URL.createObjectURL(file),
+    }));
+    setPhotos([...photos, ...newPhotos]);
+  };
+
+  const removePhoto = (index) => {
+    URL.revokeObjectURL(photos[index].preview);
+    setPhotos(photos.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSubmitting(true);
 
     try {
+      // Create FormData for multipart upload
+      const submitData = new FormData();
+
       const report = {
         fullName: formData.fullName,
         age: parseInt(formData.age) || 0,
@@ -79,8 +97,20 @@ function MissingPersonReport() {
         },
       };
 
-      await missingPersonsAPI.report(report);
+      // Add data as JSON string
+      submitData.append("data", JSON.stringify(report));
+
+      // Add photo file if exists
+      if (photos.length > 0 && photos[0].file) {
+        submitData.append("photo", photos[0].file);
+      }
+
+      await missingPersonsAPI.report(submitData);
       setSuccess(true);
+
+      // Clean up photo previews
+      photos.forEach((photo) => URL.revokeObjectURL(photo.preview));
+
       setFormData({
         fullName: "",
         age: "",
@@ -90,6 +120,7 @@ function MissingPersonReport() {
         reporterName: "",
         reporterPhone: "",
       });
+      setPhotos([]);
       setTimeout(() => setSuccess(false), 5000);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to submit report");
@@ -118,8 +149,8 @@ function MissingPersonReport() {
       <div className="form-header">
         <Search size={24} />
         <div>
-          <h3>{t("missingPerson.form.title")}</h3>
-          <p>{t("missingPerson.form.subtitle")}</p>
+          <h3>{t("missingPerson.title")}</h3>
+          <p>{t("missingPerson.subtitle")}</p>
         </div>
       </div>
 
@@ -131,11 +162,11 @@ function MissingPersonReport() {
       )}
 
       <div className="form-section">
-        <h4>{t("missingPerson.form.personInfo")}</h4>
+        <h4>{t("missingPerson.personInfo")}</h4>
 
         <div className="form-group">
           <label>
-            <User size={14} /> {t("missingPerson.form.fullName")}
+            <User size={14} /> {t("missingPerson.fullName")} *
           </label>
           <input
             type="text"
@@ -143,60 +174,100 @@ function MissingPersonReport() {
             onChange={(e) =>
               setFormData({ ...formData, fullName: e.target.value })
             }
-            placeholder={t("missingPerson.form.fullNamePlaceholder")}
+            placeholder={t("missingPerson.fullNamePlaceholder")}
             required
           />
         </div>
 
         <div className="form-row">
           <div className="form-group">
-            <label>{t("missingPerson.form.age")}</label>
+            <label>{t("missingPerson.age")}</label>
             <input
               type="number"
               value={formData.age}
               onChange={(e) =>
                 setFormData({ ...formData, age: e.target.value })
               }
-              placeholder={t("missingPerson.form.age")}
+              placeholder={t("missingPerson.age")}
               min="0"
               max="150"
             />
           </div>
           <div className="form-group">
-            <label>{t("missingPerson.form.gender")}</label>
+            <label>{t("missingPerson.gender")}</label>
             <select
               value={formData.gender}
               onChange={(e) =>
                 setFormData({ ...formData, gender: e.target.value })
               }
             >
-              <option value="unknown">{t("gender.unknown")}</option>
-              <option value="male">{t("gender.male")}</option>
-              <option value="female">{t("gender.female")}</option>
-              <option value="other">{t("gender.other")}</option>
+              <option value="unknown">
+                {t("missingPerson.genderUnknown")}
+              </option>
+              <option value="male">{t("missingPerson.genderMale")}</option>
+              <option value="female">{t("missingPerson.genderFemale")}</option>
+              <option value="other">{t("missingPerson.genderOther")}</option>
             </select>
           </div>
         </div>
 
         <div className="form-group">
-          <label>{t("missingPerson.form.description")}</label>
+          <label>{t("missingPerson.description")}</label>
           <textarea
             value={formData.description}
             onChange={(e) =>
               setFormData({ ...formData, description: e.target.value })
             }
-            placeholder={t("missingPerson.form.descriptionPlaceholder")}
+            placeholder={t("missingPerson.descriptionPlaceholder")}
             rows={3}
           />
+        </div>
+
+        <div className="form-group">
+          <label>
+            <Camera size={14} /> {t("missingPerson.photo")}
+          </label>
+          <div className="photo-upload-area">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoChange}
+              id="volunteer-missing-photo"
+              hidden
+            />
+            <label
+              htmlFor="volunteer-missing-photo"
+              className="photo-upload-btn"
+            >
+              <Camera size={20} />
+              <span>{t("missingPerson.addPhoto", "Add Photo")}</span>
+            </label>
+          </div>
+          {photos.length > 0 && (
+            <div className="photo-preview-grid">
+              {photos.map((photo, index) => (
+                <div key={index} className="photo-preview-item">
+                  <img src={photo.preview} alt={`Preview ${index + 1}`} />
+                  <button
+                    type="button"
+                    className="photo-remove-btn"
+                    onClick={() => removePhoto(index)}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       <div className="form-section">
-        <h4>{t("missingPerson.form.lastSeenLocation")}</h4>
+        <h4>{t("missingPerson.lastSeen")}</h4>
 
         <div className="form-group">
           <label>
-            <MapPin size={14} /> {t("missingPerson.form.locationAddress")}
+            <MapPin size={14} /> {t("missingPerson.locationAddress")}
           </label>
           <input
             type="text"
@@ -204,7 +275,7 @@ function MissingPersonReport() {
             onChange={(e) =>
               setFormData({ ...formData, lastSeenAddress: e.target.value })
             }
-            placeholder={t("missingPerson.form.locationPlaceholder")}
+            placeholder={t("missingPerson.locationPlaceholder")}
           />
         </div>
 
@@ -212,19 +283,19 @@ function MissingPersonReport() {
           <div className="location-detected">
             <MapPin size={14} />
             <span>
-              {t("missingPerson.form.locationDetected")} {currentLocation.lat.toFixed(4)},{" "}
-              {currentLocation.lng.toFixed(4)}
+              {t("missingPerson.locationDetected")}:{" "}
+              {currentLocation.lat.toFixed(4)}, {currentLocation.lng.toFixed(4)}
             </span>
           </div>
         )}
       </div>
 
       <div className="form-section">
-        <h4>{t("missingPerson.form.contactInfo")}</h4>
+        <h4>{t("missingPerson.contactInfo")}</h4>
 
         <div className="form-group">
           <label>
-            <User size={14} /> {t("missingPerson.form.yourName")}
+            <User size={14} /> {t("missingPerson.yourName")} *
           </label>
           <input
             type="text"
@@ -232,14 +303,14 @@ function MissingPersonReport() {
             onChange={(e) =>
               setFormData({ ...formData, reporterName: e.target.value })
             }
-            placeholder={t("missingPerson.form.yourNamePlaceholder")}
+            placeholder={t("missingPerson.yourNamePlaceholder")}
             required
           />
         </div>
 
         <div className="form-group">
           <label>
-            <Phone size={14} /> {t("missingPerson.form.phoneNumber")}
+            <Phone size={14} /> {t("missingPerson.phone")} *
           </label>
           <input
             type="tel"
@@ -247,7 +318,7 @@ function MissingPersonReport() {
             onChange={(e) =>
               setFormData({ ...formData, reporterPhone: e.target.value })
             }
-            placeholder="+1 234 567 8900"
+            placeholder={t("missingPerson.phonePlaceholder")}
             required
           />
         </div>
@@ -257,12 +328,12 @@ function MissingPersonReport() {
         {submitting ? (
           <>
             <Loader2 size={18} className="spin" />
-            {t("common.submitting")}
+            {t("missingPerson.submitting")}
           </>
         ) : (
           <>
             <Search size={18} />
-            {t("missingPerson.form.submitButton")}
+            {t("missingPerson.submit")}
           </>
         )}
       </button>
@@ -275,21 +346,18 @@ function VolunteerPage() {
   const [viewMode, setViewMode] = useState("tasks"); // 'tasks' | 'voice' | 'photo' | 'missing'
 
   const tabs = [
-    { id: "tasks", icon: ClipboardList, label: t("fieldOperations.tabs.myTasks") },
-    { id: "voice", icon: Mic, label: t("fieldOperations.tabs.voiceReport") },
-    { id: "photo", icon: Camera, label: t("fieldOperations.tabs.photoReport") },
-    { id: "missing", icon: Search, label: t("fieldOperations.tabs.missingPerson") },
+    { id: "tasks", icon: ClipboardList, label: t("volunteer.myTasks") },
+    { id: "voice", icon: Mic, label: t("volunteer.voiceReport") },
+    { id: "photo", icon: Camera, label: t("volunteer.photoReport") },
+    { id: "missing", icon: Search, label: t("volunteer.missingPerson") },
   ];
 
   return (
     <div className="volunteer-page">
       {/* Simple Header */}
       <header className="field-header">
-        <div className="field-header-top">
-          <h1>{t("fieldOperations.title")}</h1>
-          <NotificationBell />
-        </div>
-        <p>{t("fieldOperations.subtitle")}</p>
+        <h1>🚨 {t("volunteer.title")}</h1>
+        <p>{t("volunteer.subtitle")}</p>
       </header>
 
       {/* Large, Easy-to-Tap Action Cards */}

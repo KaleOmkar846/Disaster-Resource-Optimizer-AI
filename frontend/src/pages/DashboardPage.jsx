@@ -2,33 +2,48 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
-  Map,
+  Map as MapComponent,
   ReportsList,
   MissionPanel,
   TriageAlertBanner,
   ResourceTracker,
   AnalyticsDashboard,
   ResourceInventory,
-  NotificationBell,
   getTriageCategoryFromUrgency,
   RoadConditions,
   MissingPersons,
   ShelterManagement,
   VolunteerManagement,
 } from "../components";
-import { useAuth } from "../contexts";
+import { ResourcesPage } from "./index";
+import { useAuth, useVolunteerRoute } from "../contexts";
 import {
   getNeedsForMap,
   getReports,
   getMissions,
   completeMission,
   rerouteMission,
+  getUnverifiedTasks,
+  getRoadConditions,
 } from "../services";
+import { SYNC_COMPLETE_EVENT } from "../services/syncService";
 import "./DashboardPage.css";
+
+const severityScoreMap = {
+  low: 3,
+  medium: 5,
+  high: 7,
+  critical: 10,
+};
 
 function DashboardPage() {
   const { t } = useTranslation();
-  const { isManager } = useAuth();
+  const { isManager, isVolunteer } = useAuth();
+  const {
+    activeRoute,
+    currentLocation: volunteerLocation,
+    routeInfo,
+  } = useVolunteerRoute();
   const [selectedReportId, setSelectedReportId] = useState(null);
   const [reroutingMissionId, setReroutingMissionId] = useState(null);
   const [activeTab, setActiveTab] = useState("map"); // "map" | "analytics" | "resources"
@@ -68,6 +83,30 @@ function DashboardPage() {
     return () => window.removeEventListener("sos-alert", handleSosAlert);
   }, []);
 
+  // Listen for sync complete events to refresh manager map when volunteers sync offline verifications
+  useEffect(() => {
+    if (!isManager) return;
+
+    const handleSyncComplete = (event) => {
+      const { synced } = event.detail;
+      if (synced > 0) {
+        console.log(
+          `Sync complete: ${synced} verifications synced, refreshing map data...`
+        );
+        // Invalidate all map-related queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ["map-needs"] });
+        queryClient.invalidateQueries({ queryKey: ["missions"] });
+        queryClient.invalidateQueries({ queryKey: ["reports"] });
+        queryClient.invalidateQueries({ queryKey: ["volunteer-tasks"] });
+      }
+    };
+
+    window.addEventListener(SYNC_COMPLETE_EVENT, handleSyncComplete);
+    return () =>
+      window.removeEventListener(SYNC_COMPLETE_EVENT, handleSyncComplete);
+  }, [isManager, queryClient]);
+
+  // Fetch needs for map (managers see all, volunteers see only their assigned tasks)
   const {
     data: needsData = [],
     isLoading: isNeedsLoading,
@@ -77,7 +116,24 @@ function DashboardPage() {
     queryKey: ["map-needs"],
     queryFn: getNeedsForMap,
     refetchInterval: 10000,
+    enabled: isManager, // Only fetch for managers
   });
+
+  // Fetch volunteer's assigned tasks (unverified tasks assigned to them)
+  const { data: volunteerTasks = [] } = useQuery({
+    queryKey: ["volunteer-tasks"],
+    queryFn: getUnverifiedTasks,
+    refetchInterval: 10000,
+    enabled: isVolunteer, // Only fetch for volunteers
+  });
+
+  const { data: roadConditions = [], isLoading: isRoadConditionsLoading } =
+    useQuery({
+      queryKey: ["road-conditions-map"],
+      queryFn: () => getRoadConditions({ status: "active" }),
+      refetchInterval: 30000,
+      enabled: isManager || isVolunteer,
+    });
 
   // Fetch reports
   const {
@@ -88,6 +144,7 @@ function DashboardPage() {
     queryKey: ["reports"],
     queryFn: () => getReports({ limit: 50 }),
     refetchInterval: 5000,
+    enabled: isManager, // Only fetch for managers
   });
 
   // Fetch missions (auto-generated routes from logistics agent)
@@ -95,25 +152,32 @@ function DashboardPage() {
     queryKey: ["missions"],
     queryFn: getMissions,
     refetchInterval: 5000,
+    enabled: isManager, // Only fetch for managers
   });
 
-  // Extract all routes from missions to display on map
+  // Extract routes from missions - now pre-computed with road-snapped geometry from OSRM
   const missionRoutes = useMemo(() => {
     const allRoutes = [];
     (missionsData || []).forEach((mission) => {
       const stationType = mission.station?.type || "rescue";
       (mission.routes || []).forEach((routeData) => {
         if (routeData.route && routeData.route.length > 0) {
-          const formattedRoute = routeData.route.map((coord) => ({
-            lat: coord[0],
-            lon: coord[1],
-          }));
+          // Routes now come pre-computed with road geometry from OSRM
+          // Format: [[lat, lon], [lat, lon], ...] or [{lat, lon}, ...]
+          const formattedRoute = routeData.route.map((coord) => {
+            if (Array.isArray(coord)) {
+              return { lat: coord[0], lon: coord[1] };
+            }
+            return { lat: coord.lat, lon: coord.lon ?? coord.lng };
+          });
           allRoutes.push({
             vehicleId: routeData.vehicle_id,
             route: formattedRoute,
             distance: routeData.total_distance,
             stationType: routeData.station_type || stationType,
             stationName: routeData.station_name || mission.station?.name,
+            missionId: mission._id,
+            isRoadSnapped: routeData.is_road_snapped ?? true,
           });
         }
       });
@@ -166,8 +230,54 @@ function DashboardPage() {
     [reportsData]
   );
 
-  // Combine needs and analyzed reports for the map
+  // Convert volunteer tasks to map items (for volunteer mode)
+  const volunteerMapItems = useMemo(() => {
+    return (volunteerTasks || [])
+      .filter(
+        (task) => typeof task.lat === "number" && typeof task.lon === "number"
+      )
+      .map((task) => ({
+        id: task.id,
+        lat: task.lat,
+        lon: task.lon,
+        status: task.status || "Unverified",
+        category: task.needType || "Task",
+        severity: task.urgency || 5,
+        needs: [],
+        text: task.description || task.notes || "Assigned task",
+        isReport: false,
+        isTask: true,
+      }));
+  }, [volunteerTasks]);
+
+  const roadConditionMapItems = useMemo(() => {
+    return (roadConditions || [])
+      .filter(
+        (condition) =>
+          typeof condition?.startPoint?.lat === "number" &&
+          typeof condition?.startPoint?.lng === "number"
+      )
+      .map((condition) => ({
+        id: condition.conditionId || condition._id,
+        lat: condition.startPoint.lat,
+        lon: condition.startPoint.lng,
+        status: "Report",
+        category: condition.conditionType || "Road",
+        severity: severityScoreMap[condition.severity] ?? 5,
+        needs: condition.roadName ? [condition.roadName] : [],
+        text: condition.description,
+        description: condition.description,
+        isReport: true,
+      }));
+  }, [roadConditions]);
+
+  // Combine needs and analyzed reports for the map (manager view)
   const allMapItems = useMemo(() => {
+    // For volunteers, only show their assigned tasks
+    if (isVolunteer) {
+      return [...volunteerMapItems, ...roadConditionMapItems];
+    }
+    // For managers, show all needs, reports, and SOS alerts
     const reportItems = analyzedReports.map((report) => ({
       id: `report-${report.id}`,
       lat: report.lat,
@@ -179,8 +289,15 @@ function DashboardPage() {
       text: report.text || report.transcription,
       isReport: true,
     }));
-    return [...needs, ...reportItems, ...sosMapItems];
-  }, [needs, analyzedReports, sosMapItems]);
+    return [...needs, ...reportItems, ...sosMapItems, ...roadConditionMapItems];
+  }, [
+    needs,
+    analyzedReports,
+    sosMapItems,
+    roadConditionMapItems,
+    isVolunteer,
+    volunteerMapItems,
+  ]);
 
   const handleReportClick = (report) => {
     setSelectedReportId(report.id);
@@ -298,15 +415,14 @@ function DashboardPage() {
             <div className="header-title">
               <h1>
                 <span className="desktop-title">{t("dashboard.title")}</span>
-                <span className="mobile-title">Command Center</span>
+                <span className="mobile-title">{t("dashboard.title")}</span>
               </h1>
               <span className="pill pill-critical">
-                {criticalItems.length} critical
+                {criticalItems.length} {t("triage.critical").toLowerCase()}
               </span>
             </div>
 
             <div className="header-actions">
-              <NotificationBell />
               <button
                 className="btn-refresh"
                 onClick={handleRefreshAll}
@@ -318,7 +434,9 @@ function DashboardPage() {
                   }`}
                 ></span>
                 <span>
-                  {isFetching || isReportsLoading ? "Syncing" : "Refresh"}
+                  {isFetching || isReportsLoading
+                    ? t("dashboard.syncing")
+                    : t("dashboard.refresh")}
                 </span>
               </button>
             </div>
@@ -326,19 +444,21 @@ function DashboardPage() {
 
           <div className="header-stats-row">
             <div className="stat-chip stat-total">
-              <span className="stat-heading">Incidents</span>
+              <span className="stat-heading">
+                {t("dashboard.totalIncidents")}
+              </span>
               <span className="stat-value">{allMapItems.length}</span>
             </div>
             <div className="stat-chip stat-pending">
-              <span className="stat-heading">Pending</span>
+              <span className="stat-heading">{t("dashboard.pending")}</span>
               <span className="stat-value">{pendingCount}</span>
             </div>
             <div className="stat-chip stat-active">
-              <span className="stat-heading">Active</span>
+              <span className="stat-heading">{t("dashboard.inProgress")}</span>
               <span className="stat-value">{inProgressCount}</span>
             </div>
             <div className="stat-chip stat-missions">
-              <span className="stat-heading">Missions</span>
+              <span className="stat-heading">{t("missions.title")}</span>
               <span className="stat-value">{missionsData?.length || 0}</span>
             </div>
           </div>
@@ -352,26 +472,26 @@ function DashboardPage() {
             <button
               className={`nav-item ${activeTab === "map" ? "active" : ""}`}
               onClick={() => setActiveTab("map")}
-              title="Map View"
+              title={t("nav.map")}
             >
               <span className="nav-icon">🗺️</span>
-              <span className="nav-label">Map</span>
+              <span className="nav-label">{t("nav.map")}</span>
             </button>
             <button
               className={`nav-item ${activeTab === "roads" ? "active" : ""}`}
               onClick={() => setActiveTab("roads")}
-              title="Road Conditions"
+              title={t("nav.roads")}
             >
               <span className="nav-icon">🚧</span>
-              <span className="nav-label">Roads</span>
+              <span className="nav-label">{t("nav.roads")}</span>
             </button>
             <button
               className={`nav-item ${activeTab === "missing" ? "active" : ""}`}
               onClick={() => setActiveTab("missing")}
-              title="Missing Persons"
+              title={t("nav.missing")}
             >
               <span className="nav-icon">🔍</span>
-              <span className="nav-label">Missing</span>
+              <span className="nav-label">{t("nav.missing")}</span>
             </button>
             {isManager && (
               <>
@@ -380,40 +500,40 @@ function DashboardPage() {
                     activeTab === "shelters" ? "active" : ""
                   }`}
                   onClick={() => setActiveTab("shelters")}
-                  title="Shelters"
+                  title={t("nav.shelters")}
                 >
                   <span className="nav-icon">🏠</span>
-                  <span className="nav-label">Shelters</span>
+                  <span className="nav-label">{t("nav.shelters")}</span>
                 </button>
                 <button
                   className={`nav-item ${
                     activeTab === "resources" ? "active" : ""
                   }`}
                   onClick={() => setActiveTab("resources")}
-                  title="Resources"
+                  title={t("nav.resources")}
                 >
                   <span className="nav-icon">📦</span>
-                  <span className="nav-label">Resources</span>
+                  <span className="nav-label">{t("nav.resources")}</span>
                 </button>
                 <button
                   className={`nav-item ${
                     activeTab === "analytics" ? "active" : ""
                   }`}
                   onClick={() => setActiveTab("analytics")}
-                  title="Analytics"
+                  title={t("nav.analytics")}
                 >
                   <span className="nav-icon">📊</span>
-                  <span className="nav-label">Analytics</span>
+                  <span className="nav-label">{t("nav.analytics")}</span>
                 </button>
                 <button
                   className={`nav-item ${
                     activeTab === "volunteers" ? "active" : ""
                   }`}
                   onClick={() => setActiveTab("volunteers")}
-                  title="Team"
+                  title={t("nav.team")}
                 >
                   <span className="nav-icon">👥</span>
-                  <span className="nav-label">Team</span>
+                  <span className="nav-label">{t("nav.team")}</span>
                 </button>
               </>
             )}
@@ -427,83 +547,94 @@ function DashboardPage() {
             <div className="map-view-layout">
               {/* Center - Map */}
               <main className="map-container">
-                <Map
+                <MapComponent
                   needs={allMapItems}
                   selectedNeedIds={new Set()}
                   onPinClick={() => {}}
                   missionRoutes={missionRoutes}
                   isRerouteMode={!!reroutingMissionId}
                   onStationClick={handleStationClick}
+                  volunteerMode={isVolunteer}
+                  volunteerLocation={volunteerLocation}
+                  volunteerRoute={activeRoute}
+                  isRouteFallback={routeInfo?.isFallback || false}
                 />
-                {(isNeedsLoading || isReportsLoading) && (
+                {(isNeedsLoading ||
+                  isReportsLoading ||
+                  isRoadConditionsLoading) &&
+                  !isVolunteer && (
                   <div className="map-loading-overlay">
                     <div className="spinner"></div>
-                    <span>Loading...</span>
+                    <span>{t("common.loading")}</span>
                   </div>
                 )}
               </main>
 
-              {/* Bottom Panel - Missions & Reports */}
-              <aside
-                className={`panel panel-combined ${isPanelOpen ? "open" : ""}`}
-              >
-                <div
-                  className="panel-toggle-handle"
-                  onClick={() => setIsPanelOpen(!isPanelOpen)}
-                  aria-label="Toggle panel"
+              {/* Bottom Panel - Missions & Reports (Only for managers) */}
+              {isManager && (
+                <aside
+                  className={`panel panel-combined ${
+                    isPanelOpen ? "open" : ""
+                  }`}
                 >
-                  <span className="handle-bar"></span>
-                </div>
-                <div className="panel-tabs">
-                  <button
-                    className={`panel-tab ${
-                      activePanel === "missions" ? "active" : ""
-                    }`}
-                    onClick={() => {
-                      setActivePanel("missions");
-                      setIsPanelOpen(true);
-                    }}
+                  <div
+                    className="panel-toggle-handle"
+                    onClick={() => setIsPanelOpen(!isPanelOpen)}
+                    aria-label="Toggle panel"
                   >
-                    Missions
-                    <span className="tab-badge">
-                      {missionsData?.length || 0}
-                    </span>
-                  </button>
-                  <button
-                    className={`panel-tab ${
-                      activePanel === "reports" ? "active" : ""
-                    }`}
-                    onClick={() => {
-                      setActivePanel("reports");
-                      setIsPanelOpen(true);
-                    }}
-                  >
-                    Reports
-                    <span className="tab-badge">
-                      {unroutedReports?.length || 0}
-                    </span>
-                  </button>
-                </div>
+                    <span className="handle-bar"></span>
+                  </div>
+                  <div className="panel-tabs">
+                    <button
+                      className={`panel-tab ${
+                        activePanel === "missions" ? "active" : ""
+                      }`}
+                      onClick={() => {
+                        setActivePanel("missions");
+                        setIsPanelOpen(true);
+                      }}
+                    >
+                      {t("missions.title")}
+                      <span className="tab-badge">
+                        {missionsData?.length || 0}
+                      </span>
+                    </button>
+                    <button
+                      className={`panel-tab ${
+                        activePanel === "reports" ? "active" : ""
+                      }`}
+                      onClick={() => {
+                        setActivePanel("reports");
+                        setIsPanelOpen(true);
+                      }}
+                    >
+                      {t("missions.reports")}
+                      <span className="tab-badge">
+                        {unroutedReports?.length || 0}
+                      </span>
+                    </button>
+                  </div>
 
-                <div className="panel-body">
-                  {activePanel === "missions" ? (
-                    <MissionPanel
-                      missions={missionsData || []}
-                      missionRoutes={missionRoutes}
-                      onCompleteMission={handleCompleteMission}
-                      onStartReroute={handleStartReroute}
-                      reroutingMissionId={reroutingMissionId}
-                      onCancelReroute={handleCancelReroute}
-                    />
-                  ) : (
-                    <ReportsList
-                      reports={unroutedReports}
-                      onReportClick={handleReportClick}
-                      selectedReportId={selectedReportId}
-                    />
-                  )}
-                </div>
-              </aside>
+                  <div className="panel-body">
+                    {activePanel === "missions" ? (
+                      <MissionPanel
+                        missions={missionsData || []}
+                        missionRoutes={missionRoutes}
+                        onCompleteMission={handleCompleteMission}
+                        onStartReroute={handleStartReroute}
+                        reroutingMissionId={reroutingMissionId}
+                        onCancelReroute={handleCancelReroute}
+                      />
+                    ) : (
+                      <ReportsList
+                        reports={unroutedReports}
+                        onReportClick={handleReportClick}
+                        selectedReportId={selectedReportId}
+                      />
+                    )}
+                  </div>
+                </aside>
+              )}
             </div>
           )}
 
@@ -526,9 +657,8 @@ function DashboardPage() {
           )}
 
           {activeTab === "resources" && isManager && (
-            <div className="dashboard-fullwidth">
-              <ResourceTracker />
-              <ResourceInventory />
+            <div className="dashboard-fullwidth" style={{ padding: 0 }}>
+              <ResourcesPage />
             </div>
           )}
 

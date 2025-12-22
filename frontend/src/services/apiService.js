@@ -283,11 +283,16 @@ export async function getMissingPersons(options = {}) {
 }
 
 /**
- * Report a missing person
+ * Report a missing person (supports photo upload)
+ * @param {Object|FormData} data - Person data or FormData with photo
  */
-export async function reportMissingPerson(person) {
+export async function reportMissingPerson(data) {
   try {
-    const response = await apiClient.post("/missing-persons", person);
+    // Check if data is FormData (has photo)
+    const isFormData = data instanceof FormData;
+    const response = await apiClient.post("/missing-persons", data, {
+      headers: isFormData ? { "Content-Type": "multipart/form-data" } : {},
+    });
     return response.data.data;
   } catch (error) {
     console.error("Error reporting missing person:", error);
@@ -448,44 +453,26 @@ export const sheltersAPI = {
   },
 };
 
-/**
- * Add urgent need to shelter
- */
-export async function addShelterNeed(shelterId, need) {
-  try {
-    const response = await apiClient.post(`/shelters/${shelterId}/needs`, need);
-    return response.data.data;
-  } catch (error) {
-    console.error("Error adding need:", error);
-    throw error;
-  }
-}
+// ============================================
+// Route Calculation API
+// ============================================
 
 /**
- * Check-in at shelter
+ * Calculate a volunteer route from origin to destination
+ * Uses centralized backend routing service (OSRM)
+ * @param {Object} origin - Starting point {lat, lon/lng}
+ * @param {Object} destination - Destination point {lat, lon/lng}
+ * @returns {Promise<Object>} Route data with geometry, distance, duration
  */
-export async function shelterCheckIn(shelterId, checkInData) {
+export async function getVolunteerRoute(origin, destination) {
   try {
-    const response = await apiClient.patch(
-      `/shelters/${shelterId}/checkin`,
-      checkInData
-    );
+    const response = await apiClient.post("/routes/volunteer", {
+      origin,
+      destination,
+    });
     return response.data.data;
   } catch (error) {
-    console.error("Error checking in:", error);
-    throw error;
-  }
-}
-
-/**
- * Get shelter statistics summary
- */
-export async function getShelterStats() {
-  try {
-    const response = await apiClient.get("/shelters/stats/summary");
-    return response.data.data;
-  } catch (error) {
-    console.error("Error fetching shelter stats:", error);
+    console.error("Error calculating volunteer route:", error);
     throw error;
   }
 }

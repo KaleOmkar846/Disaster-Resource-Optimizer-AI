@@ -9,6 +9,7 @@ export const apiClient = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true, // Enable sending cookies for session management
 });
 
 // Ensure auth header is set if a PIN is stored (helps after page refreshes)

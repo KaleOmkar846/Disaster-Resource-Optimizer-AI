@@ -8,7 +8,7 @@ import roadConditionRoutes from "./roadConditionRoutes.js";
 import missingPersonRoutes from "./missingPersonRoutes.js";
 import shelterRoutes from "./shelterRoutes.js";
 import authRoutes from "./authRoutes.js";
-import analyticsRoutes from "./analyticsRoutes.js";
+import routeRoutes from "./routeRoutes.js";
 
 const router = express.Router();
 
@@ -21,6 +21,6 @@ router.use(weatherRoutes);
 router.use(roadConditionRoutes);
 router.use(missingPersonRoutes);
 router.use(shelterRoutes);
-router.use(analyticsRoutes);
+router.use(routeRoutes);
 
 export default router;

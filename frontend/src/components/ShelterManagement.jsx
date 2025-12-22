@@ -21,25 +21,24 @@ import {
   Zap,
   Thermometer,
   ShieldCheck,
-  Package,
   Edit,
   Navigation,
 } from "lucide-react";
 import { sheltersAPI } from "../services/apiService";
 import "./ShelterManagement.css";
 
-const StatusBadge = ({ status }) => {
+const StatusBadge = ({ status, t }) => {
   const statusConfig = {
-    open: { color: "status-open", label: "Open" },
-    full: { color: "status-full", label: "Full" },
-    closing: { color: "status-closing", label: "Closing Soon" },
-    closed: { color: "status-closed", label: "Closed" },
+    open: { color: "status-open", key: "shelter.statusOpen" },
+    full: { color: "status-full", key: "shelter.statusFull" },
+    closing: { color: "status-closing", key: "shelter.statusClosing" },
+    closed: { color: "status-closed", key: "shelter.statusClosed" },
   };
 
   const config = statusConfig[status] || statusConfig.closed;
 
   return (
-    <span className={`shelter-status ${config.color}`}>{config.label}</span>
+    <span className={`shelter-status ${config.color}`}>{t(config.key)}</span>
   );
 };
 
@@ -113,10 +112,12 @@ const ShelterCard = ({ shelter, onEdit, onUpdate }) => {
           <h4>{shelter.name}</h4>
           <div className="shelter-meta">
             <MapPin size={12} />
-            <span>{shelter.location?.address || "Location not specified"}</span>
+            <span>
+              {shelter.location?.address || t("shelter.locationNotSpecified")}
+            </span>
           </div>
         </div>
-        <StatusBadge status={shelter.status} />
+        <StatusBadge status={shelter.status} t={t} />
         {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </div>
 
@@ -130,15 +131,21 @@ const ShelterCard = ({ shelter, onEdit, onUpdate }) => {
       <div className="shelter-demographics">
         <div className="demo-item">
           <Users size={14} />
-          <span>{shelter.capacity?.families || 0} Families</span>
+          <span>
+            {shelter.capacity?.families || 0} {t("shelter.families")}
+          </span>
         </div>
         <div className="demo-item">
           <Baby size={14} />
-          <span>{shelter.capacity?.children || 0} Children</span>
+          <span>
+            {shelter.capacity?.children || 0} {t("shelter.children")}
+          </span>
         </div>
         <div className="demo-item">
           <UserCheck size={14} />
-          <span>{shelter.capacity?.elderly || 0} Elderly</span>
+          <span>
+            {shelter.capacity?.elderly || 0} {t("shelter.elderly")}
+          </span>
         </div>
       </div>
 
@@ -146,7 +153,7 @@ const ShelterCard = ({ shelter, onEdit, onUpdate }) => {
         <div className="shelter-details">
           {facilitiesList.length > 0 && (
             <div className="detail-section">
-              <h5>Facilities Available</h5>
+              <h5>{t("shelter.facilitiesAvailable")}</h5>
               <div className="facilities-list">
                 {facilitiesList.map((facility, index) => (
                   <span key={index} className="facility-tag">
@@ -162,7 +169,7 @@ const ShelterCard = ({ shelter, onEdit, onUpdate }) => {
             <div className="detail-section urgent">
               <h5>
                 <AlertTriangle size={14} />
-                Urgent Needs
+                {t("shelter.urgentNeeds")}
               </h5>
               <div className="needs-list">
                 {shelter.urgentNeeds.map((need, index) => (
@@ -176,28 +183,28 @@ const ShelterCard = ({ shelter, onEdit, onUpdate }) => {
 
           {shelter.supplies && (
             <div className="detail-section">
-              <h5>Supply Status</h5>
+              <h5>{t("shelter.supplyStatus")}</h5>
               <div className="supplies-grid">
                 <div className="supply-item">
-                  <span className="supply-label">Food</span>
+                  <span className="supply-label">{t("shelter.food")}</span>
                   <span className={`supply-status ${shelter.supplies.food}`}>
                     {shelter.supplies.food}
                   </span>
                 </div>
                 <div className="supply-item">
-                  <span className="supply-label">Water</span>
+                  <span className="supply-label">{t("shelter.water")}</span>
                   <span className={`supply-status ${shelter.supplies.water}`}>
                     {shelter.supplies.water}
                   </span>
                 </div>
                 <div className="supply-item">
-                  <span className="supply-label">Medical</span>
+                  <span className="supply-label">{t("shelter.medical")}</span>
                   <span className={`supply-status ${shelter.supplies.medical}`}>
                     {shelter.supplies.medical}
                   </span>
                 </div>
                 <div className="supply-item">
-                  <span className="supply-label">Blankets</span>
+                  <span className="supply-label">{t("shelter.blankets")}</span>
                   <span
                     className={`supply-status ${shelter.supplies.blankets}`}
                   >
@@ -210,7 +217,7 @@ const ShelterCard = ({ shelter, onEdit, onUpdate }) => {
 
           {(contact.phone || managerName) && (
             <div className="detail-section">
-              <h5>Contact</h5>
+              <h5>{t("shelter.contact")}</h5>
               <div className="contact-info">
                 {contact.phone && (
                   <a href={`tel:${contact.phone}`} className="contact-link">
@@ -218,8 +225,10 @@ const ShelterCard = ({ shelter, onEdit, onUpdate }) => {
                     {contact.phone}
                   </a>
                 )}
-                {managerName && (
-                  <span className="manager-name">Manager: {managerName}</span>
+                {shelter.contactInfo.manager && (
+                  <span className="manager-name">
+                    {t("shelter.manager")}: {shelter.contactInfo.manager}
+                  </span>
                 )}
               </div>
             </div>
@@ -228,7 +237,7 @@ const ShelterCard = ({ shelter, onEdit, onUpdate }) => {
           <div className="shelter-actions">
             <button className="btn-navigate">
               <Navigation size={14} />
-              Navigate
+              {t("shelter.navigate")}
             </button>
             <button
               className="btn-edit"
@@ -238,7 +247,7 @@ const ShelterCard = ({ shelter, onEdit, onUpdate }) => {
               }}
             >
               <Edit size={14} />
-              Edit
+              {t("common.edit", "Edit")}
             </button>
             <button
               className="btn-update-capacity"
@@ -248,7 +257,7 @@ const ShelterCard = ({ shelter, onEdit, onUpdate }) => {
               }}
             >
               <Users size={14} />
-              Update Capacity
+              {t("shelter.updateCapacity")}
             </button>
           </div>
         </div>
@@ -329,10 +338,10 @@ const AddShelterForm = ({ onSubmit, onCancel, currentLocation }) => {
 
   return (
     <form className="add-shelter-form" onSubmit={handleSubmit}>
-      <h4>Register New Shelter</h4>
+      <h4>{t("shelter.registerShelter")}</h4>
 
       <div className="form-group">
-        <label>Shelter Name *</label>
+        <label>{t("shelter.shelterName")} *</label>
         <input
           type="text"
           value={formData.name}
@@ -343,7 +352,7 @@ const AddShelterForm = ({ onSubmit, onCancel, currentLocation }) => {
       </div>
 
       <div className="form-group">
-        <label>Address</label>
+        <label>{t("shelter.address")}</label>
         <input
           type="text"
           value={formData.address}
@@ -358,14 +367,14 @@ const AddShelterForm = ({ onSubmit, onCancel, currentLocation }) => {
         <div className="location-info">
           <MapPin size={14} />
           <span>
-            Location: {currentLocation.lat.toFixed(5)},{" "}
+            {t("tasks.location")}: {currentLocation.lat.toFixed(5)},{" "}
             {currentLocation.lng.toFixed(5)}
           </span>
         </div>
       )}
 
       <div className="form-group">
-        <label>Total Capacity</label>
+        <label>{t("shelter.totalCapacity")}</label>
         <input
           type="number"
           value={formData.totalCapacity}
@@ -378,7 +387,7 @@ const AddShelterForm = ({ onSubmit, onCancel, currentLocation }) => {
       </div>
 
       <div className="form-group">
-        <label>Facilities Available</label>
+        <label>{t("shelter.facilitiesAvailable")}</label>
         <div className="facilities-select">
           {facilityOptions.map((facility) => (
             <button
@@ -398,7 +407,7 @@ const AddShelterForm = ({ onSubmit, onCancel, currentLocation }) => {
 
       <div className="form-row">
         <div className="form-group">
-          <label>Contact Phone</label>
+          <label>{t("shelter.managerPhone")}</label>
           <input
             type="tel"
             value={formData.phone}
@@ -410,7 +419,7 @@ const AddShelterForm = ({ onSubmit, onCancel, currentLocation }) => {
         </div>
 
         <div className="form-group">
-          <label>Manager Name</label>
+          <label>{t("shelter.managerName")}</label>
           <input
             type="text"
             value={formData.manager}
@@ -424,18 +433,18 @@ const AddShelterForm = ({ onSubmit, onCancel, currentLocation }) => {
 
       <div className="form-actions">
         <button type="button" className="btn-cancel" onClick={onCancel}>
-          Cancel
+          {t("common.cancel")}
         </button>
         <button type="submit" className="btn-submit" disabled={!formData.name}>
           <Home size={14} />
-          Register Shelter
+          {t("shelter.register")}
         </button>
       </div>
     </form>
   );
 };
 
-const UpdateCapacityModal = ({ shelter, onUpdate, onClose }) => {
+const UpdateCapacityModal = ({ shelter, onUpdate, onClose, t }) => {
   const [capacity, setCapacity] = useState({
     current: shelter.capacity?.current || 0,
     families: shelter.capacity?.families || 0,
@@ -453,7 +462,9 @@ const UpdateCapacityModal = ({ shelter, onUpdate, onClose }) => {
     <div className="modal-overlay" onClick={onClose}>
       <div className="capacity-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h4>Update Capacity - {shelter.name}</h4>
+          <h4>
+            {t("shelter.updateCapacity")} - {shelter.name}
+          </h4>
           <button className="close-btn" onClick={onClose}>
             <X size={16} />
           </button>
@@ -464,7 +475,7 @@ const UpdateCapacityModal = ({ shelter, onUpdate, onClose }) => {
             <div className="capacity-input">
               <label>
                 <Users size={16} />
-                Current Occupancy
+                {t("shelter.currentOccupancy")}
               </label>
               <input
                 type="number"
@@ -486,7 +497,7 @@ const UpdateCapacityModal = ({ shelter, onUpdate, onClose }) => {
             <div className="capacity-input">
               <label>
                 <Home size={16} />
-                Families
+                {t("shelter.families")}
               </label>
               <input
                 type="number"
@@ -504,7 +515,7 @@ const UpdateCapacityModal = ({ shelter, onUpdate, onClose }) => {
             <div className="capacity-input">
               <label>
                 <Baby size={16} />
-                Children
+                {t("shelter.children")}
               </label>
               <input
                 type="number"
@@ -522,7 +533,7 @@ const UpdateCapacityModal = ({ shelter, onUpdate, onClose }) => {
             <div className="capacity-input">
               <label>
                 <UserCheck size={16} />
-                Elderly
+                {t("shelter.elderly")}
               </label>
               <input
                 type="number"
@@ -540,11 +551,11 @@ const UpdateCapacityModal = ({ shelter, onUpdate, onClose }) => {
 
           <div className="modal-actions">
             <button type="button" className="btn-cancel" onClick={onClose}>
-              Cancel
+              {t("common.cancel")}
             </button>
             <button type="submit" className="btn-submit">
               <CheckCircle size={14} />
-              Update
+              {t("shelter.update")}
             </button>
           </div>
         </form>
@@ -610,13 +621,13 @@ export default function ShelterManagement({ currentLocation }) {
       <div className="panel-header">
         <div className="header-title">
           <Home size={20} />
-          <h3>Shelter Management</h3>
+          <h3>{t("shelter.title")}</h3>
         </div>
         <div className="header-actions">
           <button
             className="btn-refresh"
             onClick={() => refetch()}
-            title="Refresh"
+            title={t("resources.refresh")}
           >
             <RefreshCw size={16} />
           </button>
@@ -625,7 +636,7 @@ export default function ShelterManagement({ currentLocation }) {
             onClick={() => setShowAddForm(!showAddForm)}
           >
             {showAddForm ? <X size={16} /> : <Plus size={16} />}
-            {showAddForm ? "Cancel" : "Add Shelter"}
+            {showAddForm ? t("common.cancel") : t("shelter.addShelter")}
           </button>
         </div>
       </div>
@@ -633,15 +644,15 @@ export default function ShelterManagement({ currentLocation }) {
       <div className="stats-summary">
         <div className="stat-item">
           <span className="stat-value">{openShelters}</span>
-          <span className="stat-label">Open Shelters</span>
+          <span className="stat-label">{t("shelter.openShelters")}</span>
         </div>
         <div className="stat-item">
           <span className="stat-value">{currentOccupancy}</span>
-          <span className="stat-label">Current Occupancy</span>
+          <span className="stat-label">{t("shelter.currentOccupancy")}</span>
         </div>
         <div className="stat-item">
           <span className="stat-value">{totalCapacity}</span>
-          <span className="stat-label">Total Capacity</span>
+          <span className="stat-label">{t("shelter.totalCapacity")}</span>
         </div>
       </div>
 
@@ -660,7 +671,7 @@ export default function ShelterManagement({ currentLocation }) {
                 className={`filter-tab ${filter === f ? "active" : ""}`}
                 onClick={() => setFilter(f)}
               >
-                {f.charAt(0).toUpperCase() + f.slice(1)}
+                {t(`shelter.filter${f.charAt(0).toUpperCase() + f.slice(1)}`)}
               </button>
             ))}
           </div>
@@ -669,13 +680,13 @@ export default function ShelterManagement({ currentLocation }) {
             {isLoading ? (
               <div className="loading-state">
                 <RefreshCw className="spin" size={20} />
-                <span>Loading shelters...</span>
+                <span>{t("common.loading")}</span>
               </div>
             ) : shelters?.length === 0 ? (
               <div className="empty-state">
                 <Home size={32} />
-                <p>No shelters registered</p>
-                <span>Add shelters to track evacuation centers</span>
+                <p>{t("shelter.noShelters")}</p>
+                <span>{t("shelter.noSheltersHint")}</span>
               </div>
             ) : (
               shelters.map((shelter) => (
@@ -702,6 +713,7 @@ export default function ShelterManagement({ currentLocation }) {
             setShowCapacityModal(false);
             setSelectedShelter(null);
           }}
+          t={t}
         />
       )}
     </div>
