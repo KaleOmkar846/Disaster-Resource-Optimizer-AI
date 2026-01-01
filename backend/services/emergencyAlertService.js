@@ -538,6 +538,160 @@ export async function dispatchEmergencyAlert(
 }
 
 /**
+ * Dispatch emergency alert to a specific station (used for rerouting)
+ * @param {Object} sourceData - The report/need data
+ * @param {String} sourceType - "Report" or "Need"
+ * @param {Object} targetStation - { type, name, lat, lon }
+ */
+export async function dispatchAlertToStation(
+  sourceData,
+  sourceType = "Report",
+  targetStation
+) {
+  try {
+    // Determine emergency type
+    const emergencyType = determineEmergencyType(sourceData);
+    logger.info(
+      `Dispatching rerouted alert to ${targetStation.name} (${targetStation.type})`
+    );
+
+    // Get location
+    const location =
+      sourceType === "Report" ? sourceData.location : sourceData.coordinates;
+
+    const lat = location?.lat || location?.latitude;
+    const lng = location?.lng || location?.lon || location?.longitude;
+
+    if (!lat || !lng) {
+      logger.error("Cannot dispatch alert: No location data");
+      return { success: false, error: "No location data" };
+    }
+
+    // Create alert data
+    const alertData = createAlertData(sourceData, sourceType, emergencyType);
+
+    // Create alert record
+    const alert = new EmergencyAlert(alertData);
+    await alert.save();
+
+    logger.info(`Created emergency alert for reroute: ${alert.alertId}`);
+
+    // Find the target station by name and type
+    const station = await EmergencyStation.findOne({
+      name: targetStation.name,
+      type: targetStation.type,
+      status: "active",
+    });
+
+    if (!station) {
+      logger.warn(
+        `Target station not found: ${targetStation.name} (${targetStation.type})`
+      );
+
+      // Try to find any active station of this type
+      const fallbackStation = await EmergencyStation.findOne({
+        type: targetStation.type,
+        status: "active",
+      });
+
+      if (!fallbackStation) {
+        alert.status = "dispatched";
+        alert.dispatchedAt = new Date();
+        await alert.save();
+
+        return {
+          success: true,
+          alertId: alert.alertId,
+          stationsNotified: 0,
+          message: "Alert created but target station not available",
+        };
+      }
+
+      // Use fallback station
+      logger.info(`Using fallback station: ${fallbackStation.name}`);
+    }
+
+    const targetStationDoc = station || fallbackStation;
+
+    // Send alert to the target station
+    const result = await sendAlertToStation(targetStationDoc, {
+      ...alertData,
+      alertId: alert.alertId,
+    });
+
+    // Record the station in the alert
+    alert.sentToStations.push({
+      stationId: targetStationDoc._id,
+      stationName: targetStationDoc.name,
+      stationType: targetStationDoc.type,
+      distance: 0, // Distance not calculated for reroutes
+      sentAt: new Date(),
+      deliveryStatus: result.status,
+    });
+
+    // Update station stats
+    targetStationDoc.stats.totalAlertsReceived += 1;
+    targetStationDoc.lastPingAt = new Date();
+    await targetStationDoc.save();
+
+    // Update alert status
+    alert.status = "dispatched";
+    alert.dispatchedAt = new Date();
+    alert.sourceDocument = sourceData._id;
+    await alert.save();
+
+    // Update the source report/need's emergencyStatus
+    if (sourceData._id) {
+      try {
+        const Report = (await import("../models/ReportModel.js")).default;
+        const Need = (await import("../models/NeedModel.js")).default;
+
+        const updateData = {
+          emergencyStatus: "assigned",
+          emergencyType: emergencyType,
+          emergencyAlertId: alert.alertId,
+          "assignedStation.stationId": targetStationDoc._id,
+          "assignedStation.stationName": targetStationDoc.name,
+          "assignedStation.stationType": targetStationDoc.type,
+          "assignedStation.assignedAt": new Date(),
+        };
+
+        await Report.findByIdAndUpdate(sourceData._id, updateData);
+        await Need.findByIdAndUpdate(sourceData._id, updateData);
+
+        logger.info(
+          `Updated report/need ${sourceData._id} with new station assignment`
+        );
+      } catch (err) {
+        logger.warn(
+          `Could not update report/need emergencyStatus: ${err.message}`
+        );
+      }
+    }
+
+    logger.info(`Rerouted alert dispatched to ${targetStationDoc.name}`, {
+      alertId: alert.alertId,
+      success: result.success,
+    });
+
+    return {
+      success: true,
+      alertId: alert.alertId,
+      emergencyType,
+      stationName: targetStationDoc.name,
+      stationType: targetStationDoc.type,
+      deliveryStatus: result.status,
+    };
+  } catch (error) {
+    logger.error("Error dispatching rerouted alert:", error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
+/**
  * Process acknowledgment from a station
  */
 export async function processStationAcknowledgment(
@@ -682,6 +836,7 @@ export async function pingStation(stationId) {
 
 export default {
   dispatchEmergencyAlert,
+  dispatchAlertToStation,
   processStationAcknowledgment,
   getAllStations,
   registerStation,

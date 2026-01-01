@@ -8,7 +8,7 @@ import {
   getAllReports,
   getReportById,
 } from "../controllers/voiceReportController.js";
-import { requireAuth } from "../middleware/authMiddleware.js";
+import { requireAuth, allowPublic } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -72,6 +72,7 @@ const upload = multer({
 /**
  * POST /api/reports/audio
  * Upload and process audio report
+ * PUBLIC ACCESS: Allows unauthenticated users to submit reports
  *
  * Request:
  * - Content-Type: multipart/form-data
@@ -85,13 +86,14 @@ const upload = multer({
  * - 400: Invalid request (missing file or location)
  * - 500: Server error
  */
-router.post("/audio", requireAuth, upload.single("audio"), processAudioReport);
+router.post("/audio", allowPublic, upload.single("audio"), processAudioReport);
 
 /**
  * POST /api/reports
  * Create a new text-based report
+ * PUBLIC ACCESS: Allows unauthenticated users to submit reports
  */
-router.post("/", requireAuth, createReport);
+router.post("/", allowPublic, createReport);
 
 /**
  * GET /api/reports

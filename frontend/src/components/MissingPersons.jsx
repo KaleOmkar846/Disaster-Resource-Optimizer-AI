@@ -340,7 +340,7 @@ const PersonCard = ({ person, onView, onMarkFound }) => {
   );
 };
 
-const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
+const ReportMissingForm = ({ onSubmit, onCancel, currentLocation, isPublicMode = false }) => {
   const { t } = useTranslation();
   const [formData, setFormData] = useState({
     fullName: "",
@@ -355,6 +355,7 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
   });
   const [photos, setPhotos] = useState([]); // Stores { file, preview } objects
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
 
   const handlePhotoChange = (e) => {
     const files = Array.from(e.target.files);
@@ -411,6 +412,25 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
       }
 
       await onSubmit(submitData);
+      
+      // In public mode, show success and reset form
+      if (isPublicMode) {
+        setSubmitSuccess(true);
+        setFormData({
+          fullName: "",
+          age: "",
+          gender: "unknown",
+          description: "",
+          medicalInfo: "",
+          lastSeenAddress: "",
+          reporterName: "",
+          reporterPhone: "",
+          relationship: "",
+        });
+        setPhotos([]);
+        // Reset success after 3 seconds
+        setTimeout(() => setSubmitSuccess(false), 3000);
+      }
     } catch (error) {
       console.error("Form submission error:", error);
     } finally {
@@ -420,11 +440,21 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
 
   return (
     <div className="missing-form-container">
+      {/* Success Message for Public Mode */}
+      {isPublicMode && submitSuccess && (
+        <div className="public-success-message">
+          <CheckCircle size={24} />
+          <span>{t("family.reportSubmitted", "Report submitted successfully!")}</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="missing-form-header">
-        <button type="button" className="form-close-btn" onClick={onCancel}>
-          <X size={20} />
-        </button>
+        {!isPublicMode && (
+          <button type="button" className="form-close-btn" onClick={onCancel}>
+            <X size={20} />
+          </button>
+        )}
         <div className="form-header-content">
           <div className="form-header-icon">
             <Search size={28} />
@@ -686,10 +716,10 @@ const ReportMissingForm = ({ onSubmit, onCancel, currentLocation }) => {
   );
 };
 
-export default function MissingPersons({ currentLocation }) {
+export default function MissingPersons({ currentLocation, isPublicMode = false }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const [showReportForm, setShowReportForm] = useState(false);
+  const [showReportForm, setShowReportForm] = useState(isPublicMode); // Start with form open in public mode
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPerson, setSelectedPerson] = useState(null);
   const [filter, setFilter] = useState("all");
@@ -758,31 +788,41 @@ export default function MissingPersons({ currentLocation }) {
         <div className="header-title">
           <Users size={20} />
           <h3>{t("family.title")}</h3>
-          {missingCount > 0 && (
+          {!isPublicMode && missingCount > 0 && (
             <span className="missing-count">
               {missingCount} {t("family.filterMissing").toLowerCase()}
             </span>
           )}
         </div>
-        <div className="header-actions">
-          <button
-            className="btn-refresh"
-            onClick={() => refetch()}
-            title={t("resources.refresh")}
-          >
-            <RefreshCw size={16} />
-          </button>
-          <button
-            className="btn-report"
-            onClick={() => setShowReportForm(!showReportForm)}
-          >
-            {showReportForm ? <X size={16} /> : <Plus size={16} />}
-            {showReportForm ? t("common.cancel") : t("family.reportMissing")}
+        {!isPublicMode && (
+          <div className="header-actions">
+            <button
+              className="btn-refresh"
+              onClick={() => refetch()}
+              title={t("resources.refresh")}
+            >
+              <RefreshCw size={16} />
+            </button>
+            <button
+              className="btn-report"
+              onClick={() => setShowReportForm(!showReportForm)}
+            >
+              {showReportForm ? <X size={16} /> : <Plus size={16} />}
+              {showReportForm ? t("common.cancel") : t("family.reportMissing")}
           </button>
         </div>
+        )}
       </div>
 
-      {showReportForm ? (
+      {/* Public Mode: Always show report form */}
+      {isPublicMode ? (
+        <ReportMissingForm
+          onSubmit={handleReportSubmit}
+          onCancel={() => {}} // No cancel in public mode
+          currentLocation={currentLocation}
+          isPublicMode={true}
+        />
+      ) : showReportForm ? (
         <ReportMissingForm
           onSubmit={handleReportSubmit}
           onCancel={() => setShowReportForm(false)}
@@ -850,7 +890,7 @@ export default function MissingPersons({ currentLocation }) {
         </>
       )}
 
-      {selectedPerson && (
+      {!isPublicMode && selectedPerson && (
         <PersonDetailModal
           person={selectedPerson}
           onClose={() => setSelectedPerson(null)}

@@ -58,8 +58,10 @@ export const getAnalytics = async (req, res) => {
       recentNeeds,
       // Other
       activeMissionsCount,
+      // Response time stats
+      responseTimeStats,
     ] = await Promise.all([
-      // 1. Current Period Report Stats
+      // 1. Current Period Report Stats - count resolved from both status and emergencyStatus
       Report.aggregate([
         { $match: { createdAt: { $gte: startDate } } },
         {
@@ -67,12 +69,28 @@ export const getAnalytics = async (req, res) => {
             _id: null,
             total: { $sum: 1 },
             resolved: {
-              $sum: { $cond: [{ $eq: ["$status", "Resolved"] }, 1, 0] },
+              $sum: {
+                $cond: [
+                  {
+                    $or: [
+                      { $eq: ["$status", "Resolved"] },
+                      { $eq: ["$emergencyStatus", "resolved"] },
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
             },
             avgResolutionTime: {
               $avg: {
                 $cond: [
-                  { $eq: ["$status", "Resolved"] },
+                  {
+                    $or: [
+                      { $eq: ["$status", "Resolved"] },
+                      { $eq: ["$emergencyStatus", "resolved"] },
+                    ],
+                  },
                   { $subtract: ["$updatedAt", "$createdAt"] },
                   null,
                 ],
@@ -94,12 +112,28 @@ export const getAnalytics = async (req, res) => {
             _id: null,
             total: { $sum: 1 },
             resolved: {
-              $sum: { $cond: [{ $eq: ["$status", "Resolved"] }, 1, 0] },
+              $sum: {
+                $cond: [
+                  {
+                    $or: [
+                      { $eq: ["$status", "Resolved"] },
+                      { $eq: ["$emergencyStatus", "resolved"] },
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
             },
             avgResolutionTime: {
               $avg: {
                 $cond: [
-                  { $eq: ["$status", "Resolved"] },
+                  {
+                    $or: [
+                      { $eq: ["$status", "Resolved"] },
+                      { $eq: ["$emergencyStatus", "resolved"] },
+                    ],
+                  },
                   { $subtract: ["$updatedAt", "$createdAt"] },
                   null,
                 ],
@@ -245,6 +279,25 @@ export const getAnalytics = async (req, res) => {
 
       // 12. Active Missions Count
       mongoose.connection.db.collection("missions").countDocuments({ status: "Active" }),
+
+      // 13. Response Time Stats - time from creation to dispatch
+      Report.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: startDate },
+            "assignedStation.dispatchedAt": { $ne: null },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            avgResponseTime: {
+              $avg: { $subtract: ["$assignedStation.dispatchedAt", "$createdAt"] },
+            },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
     ]);
 
     // Process Results - Combine Report and Need data
@@ -252,12 +305,15 @@ export const getAnalytics = async (req, res) => {
     const previousReport = previousReportStats[0] || { total: 0, resolved: 0, avgResolutionTime: 0 };
     const currentNeed = currentNeedStats[0] || { total: 0, resolved: 0, avgResolutionTime: 0 };
     const previousNeed = previousNeedStats[0] || { total: 0, resolved: 0 };
+    const responseTime = responseTimeStats[0] || { avgResponseTime: 0, count: 0 };
 
     // Combined stats
     const current = {
       total: currentReport.total + currentNeed.total,
       resolved: currentReport.resolved + currentNeed.resolved,
       avgResolutionTime: currentReport.avgResolutionTime || currentNeed.avgResolutionTime || 0,
+      // Use actual response time (dispatch time) if available, otherwise fall back to resolution time
+      avgResponseTime: responseTime.avgResponseTime || currentReport.avgResolutionTime || 0,
     };
     const previous = {
       total: previousReport.total + previousNeed.total,
@@ -373,7 +429,7 @@ export const getAnalytics = async (req, res) => {
     const responseData = {
       current: {
         incidents: current.total,
-        avgResponseTime: Math.round((current.avgResolutionTime || 0) / 60000), // ms to minutes
+        avgResponseTime: Math.round((current.avgResponseTime || 0) / 60000), // ms to minutes
         resolved: current.resolved,
         activeMissions: activeMissionsCount,
       },

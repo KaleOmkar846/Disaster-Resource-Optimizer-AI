@@ -3,7 +3,7 @@ import { apiClient } from "./api";
 /**
  * Upload a photo-based report to the backend
  * @param {File} imageFile - Captured image file
- * @param {{lat: number, lng: number}} location - User location
+ * @param {{lat: number, lng: number}} location - User location (optional)
  * @param {string} message - Optional caption/description
  * @returns {Promise<Object>} Backend response payload
  */
@@ -11,8 +11,11 @@ export async function uploadPhotoReport(imageFile, location, message = "") {
   const formData = new FormData();
 
   formData.append("image", imageFile);
-  formData.append("lat", location.lat.toString());
-  formData.append("lng", location.lng.toString());
+  // Use default location if not available
+  const lat = location?.lat ?? 0;
+  const lng = location?.lng ?? 0;
+  formData.append("lat", lat.toString());
+  formData.append("lng", lng.toString());
 
   if (message) {
     formData.append("message", message);
