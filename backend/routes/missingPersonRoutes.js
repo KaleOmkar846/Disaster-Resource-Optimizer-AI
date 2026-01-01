@@ -9,7 +9,7 @@ import { v4 as uuidv4 } from "uuid";
 import MissingPerson from "../models/MissingPersonModel.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
 import { HTTP_STATUS } from "../constants/index.js";
-import { requireAuth, requireManager } from "../middleware/authMiddleware.js";
+import { requireAuth, requireManager, allowPublic } from "../middleware/authMiddleware.js";
 import { uploadImageBuffer } from "../services/cloudinaryService.js";
 
 const router = express.Router();
@@ -39,8 +39,9 @@ const photoUpload = multer({
 /**
  * GET /api/missing-persons
  * Get all missing persons
+ * PUBLIC ACCESS: Allows viewing of missing persons list
  */
-router.get("/missing-persons", requireAuth, async (req, res) => {
+router.get("/missing-persons", allowPublic, async (req, res) => {
   try {
     const { status = "missing", priority, limit = 50 } = req.query;
 
@@ -89,10 +90,11 @@ router.get("/missing-persons/:id", requireAuth, async (req, res) => {
 /**
  * POST /api/missing-persons
  * Report a missing person (supports photo upload)
+ * PUBLIC ACCESS: Allows unauthenticated users to report missing persons
  */
 router.post(
   "/missing-persons",
-  requireAuth,
+  allowPublic,
   photoUpload.single("photo"),
   async (req, res) => {
     try {

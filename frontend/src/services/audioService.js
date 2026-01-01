@@ -3,7 +3,7 @@ import { apiClient } from "./api";
 /**
  * Upload audio file to backend for transcription and analysis
  * @param {Blob} audioBlob - The audio blob to upload
- * @param {Object} location - Location object with lat and lng properties
+ * @param {Object} location - Location object with lat and lng properties (optional)
  * @returns {Promise<Object>} Response from backend with transcription and analysis
  */
 export async function uploadAudioReport(audioBlob, location) {
@@ -17,9 +17,12 @@ export async function uploadAudioReport(audioBlob, location) {
     });
     formData.append("audio", audioFile);
 
-    // Append location data
-    formData.append("lat", location.lat.toString());
-    formData.append("lng", location.lng.toString());
+    // Append location data - use default if not available
+    // Default to 0,0 if location not provided (backend can handle this)
+    const lat = location?.lat ?? 0;
+    const lng = location?.lng ?? 0;
+    formData.append("lat", lat.toString());
+    formData.append("lng", lng.toString());
 
     // Send POST request to backend
     const response = await apiClient.post("/reports/audio", formData, {

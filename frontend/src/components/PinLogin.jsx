@@ -5,99 +5,22 @@ import {
   AlertCircle,
   Loader2,
   Lock,
-  MapPinOff,
   MapPin,
+  ChevronLeft,
 } from "lucide-react";
 import "./PinLogin.css";
 
-export default function PinLogin() {
+export default function PinLogin({ onBack, selectedRole }) {
   const { login } = useAuth();
   const [pin, setPin] = useState(["", "", "", ""]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [locationStatus, setLocationStatus] = useState("checking"); // 'checking', 'granted', 'denied', 'unsupported'
   const inputRefs = [useRef(), useRef(), useRef(), useRef()];
 
-  // Check location permission on mount
+  // Focus first input on mount (location already checked in RoleSelector)
   useEffect(() => {
-    checkLocationPermission();
+    inputRefs[0].current?.focus();
   }, []);
-
-  // Focus first input when location is granted
-  useEffect(() => {
-    if (locationStatus === "granted") {
-      inputRefs[0].current?.focus();
-    }
-  }, [locationStatus]);
-
-  const checkLocationPermission = async () => {
-    if (!navigator.geolocation) {
-      setLocationStatus("unsupported");
-      return;
-    }
-
-    setLocationStatus("checking");
-
-    // Set a maximum time to wait - don't block user forever
-    const timeoutId = setTimeout(() => {
-      console.log("Location check timeout - allowing access");
-      setLocationStatus("granted");
-    }, 8000); // Max 8 seconds wait
-
-    // Try to get position - this triggers permission prompt on first visit
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        clearTimeout(timeoutId);
-        console.log(
-          "Location obtained:",
-          position.coords.latitude,
-          position.coords.longitude
-        );
-        setLocationStatus("granted");
-      },
-      (error) => {
-        clearTimeout(timeoutId);
-        console.log("Geolocation error:", error.code, error.message);
-
-        // Only block if permission was explicitly denied
-        if (error.code === 1) {
-          // PERMISSION_DENIED
-          setLocationStatus("denied");
-        } else {
-          // Timeout (3) or Position Unavailable (2) - allow access
-          // User has given permission, just GPS is slow
-          setLocationStatus("granted");
-        }
-      },
-      {
-        enableHighAccuracy: false,
-        timeout: 5000,
-        maximumAge: Infinity, // Accept any cached position
-      }
-    );
-  };
-
-  const requestLocationPermission = () => {
-    setLocationStatus("checking");
-    // On mobile, sometimes we need to reload to re-trigger permission
-    navigator.geolocation.getCurrentPosition(
-      () => {
-        setLocationStatus("granted");
-      },
-      (error) => {
-        if (error.code === 1) {
-          // Still denied - user needs to enable in settings
-          alert(
-            "Please enable location in your browser/device settings and refresh the page."
-          );
-          setLocationStatus("denied");
-        } else {
-          setLocationStatus("granted");
-        }
-      },
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: Infinity }
-    );
-  };
 
   const handleChange = (index, value) => {
     // Only allow digits
@@ -183,81 +106,20 @@ export default function PinLogin() {
     }
   };
 
-  // Location check screen
-  if (locationStatus !== "granted") {
-    return (
-      <div className="pin-login-container">
-        <div className="pin-login-card">
-          <div className="pin-login-header">
-            <div className="pin-login-logo">
-              <div className="logo-icon">
-                <ShieldCheck size={32} strokeWidth={2.5} />
-              </div>
-              <span className="logo-text">AEGIS</span>
-            </div>
-            <h1>Emergency Response Portal</h1>
-            <p className="login-subtitle">
-              Secure access for authorized personnel
-            </p>
-          </div>
-
-          <div className="location-check-section">
-            {locationStatus === "checking" ? (
-              <>
-                <div className="location-checking">
-                  <Loader2 size={32} className="spin" />
-                </div>
-                <p className="location-message">Checking location access...</p>
-              </>
-            ) : locationStatus === "unsupported" ? (
-              <>
-                <div className="location-error-icon">
-                  <MapPinOff size={32} />
-                </div>
-                <p className="location-message">
-                  Location services not supported
-                </p>
-                <p className="location-hint">
-                  This device does not support location services required for
-                  emergency response.
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="location-error-icon">
-                  <MapPinOff size={32} />
-                </div>
-                <p className="location-message">Location Access Required</p>
-                <p className="location-hint">
-                  Enable location access to use the emergency response system.
-                  Your location is needed to coordinate rescue operations.
-                </p>
-                <button
-                  className="enable-location-btn"
-                  onClick={requestLocationPermission}
-                >
-                  <MapPin size={16} />
-                  <span>Enable Location</span>
-                </button>
-              </>
-            )}
-          </div>
-
-          <div className="pin-login-footer">
-            <p>Location is required for emergency coordination.</p>
-          </div>
-        </div>
-
-        <div className="login-branding">
-          <span>Disaster Response Resource Optimization Platform</span>
-        </div>
-      </div>
-    );
-  }
+  // Get role display text
+  const roleText = selectedRole === "manager" ? "Manager" : "Volunteer";
 
   return (
     <div className="pin-login-container">
       <div className="pin-login-card">
+        {/* Back Button */}
+        {onBack && (
+          <button className="pin-back-btn" onClick={onBack}>
+            <ChevronLeft size={20} />
+            <span>Back</span>
+          </button>
+        )}
+
         <div className="pin-login-header">
           <div className="pin-login-logo">
             <div className="logo-icon">
@@ -267,7 +129,7 @@ export default function PinLogin() {
           </div>
           <h1>Emergency Response Portal</h1>
           <p className="login-subtitle">
-            Secure access for authorized personnel
+            {selectedRole ? `${roleText} Login` : "Secure access for authorized personnel"}
           </p>
         </div>
 
@@ -279,7 +141,7 @@ export default function PinLogin() {
         <div className="pin-section">
           <div className="pin-label">
             <Lock size={14} />
-            <span>Enter Access PIN</span>
+            <span>Enter {selectedRole ? roleText : "Access"} PIN</span>
           </div>
 
           <div className="pin-input-group">

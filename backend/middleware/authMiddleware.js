@@ -109,3 +109,44 @@ export const requireManager = async (req, res, next) => {
     });
   }
 };
+
+/**
+ * Middleware that allows public access but still attaches user if authenticated
+ * Use this for endpoints that should work for both public and authenticated users
+ */
+export const allowPublic = async (req, res, next) => {
+  try {
+    // Check session first
+    if (req.session && req.session.userId) {
+      const user = await User.findOne({
+        _id: req.session.userId,
+        isActive: true,
+      });
+      if (user) {
+        req.user = user;
+        return next();
+      }
+    }
+
+    // Check PIN header
+    const pin = req.headers["x-auth-pin"];
+    if (pin) {
+      const user = await User.findOne({ pin, isActive: true });
+      if (user) {
+        req.user = user;
+        return next();
+      }
+    }
+
+    // No authentication - allow as public user
+    req.user = null;
+    req.isPublicUser = true;
+    next();
+  } catch (error) {
+    console.error("Public auth middleware error:", error);
+    // Still allow public access on error
+    req.user = null;
+    req.isPublicUser = true;
+    next();
+  }
+};

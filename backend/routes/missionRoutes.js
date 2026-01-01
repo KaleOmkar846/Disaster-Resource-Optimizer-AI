@@ -4,6 +4,7 @@ import { sendSuccess, sendError } from "../utils/apiResponse.js";
 import { logger } from "../utils/appLogger.js";
 import { HTTP_STATUS } from "../constants/index.js";
 import { requireAuth, requireManager } from "../middleware/authMiddleware.js";
+import { dispatchAlertToStation } from "../services/emergencyAlertService.js";
 
 const router = express.Router();
 
@@ -22,16 +23,71 @@ router.get("/missions", requireAuth, async (req, res) => {
       .limit(20)
       .toArray();
 
-    // Transform for frontend
-    const transformedMissions = missions.map((mission) => ({
-      id: mission._id.toString(),
-      routes: mission.routes || [],
-      reportIds: mission.report_ids || [],
-      status: mission.status,
-      numVehicles: mission.num_vehicles,
-      timestamp: mission.timestamp,
-      station: mission.station || null,
-    }));
+    // Check if any reports/needs in each mission have been dispatched
+    const transformedMissions = await Promise.all(
+      missions.map(async (mission) => {
+        let hasDispatched = false;
+
+        // Check reports for dispatched status
+        if (mission.report_ids && mission.report_ids.length > 0) {
+          const reportObjectIds = mission.report_ids
+            .map((rid) => {
+              if (rid instanceof mongoose.Types.ObjectId) return rid;
+              if (typeof rid === "object" && rid.$oid)
+                return new mongoose.Types.ObjectId(rid.$oid);
+              if (mongoose.Types.ObjectId.isValid(rid))
+                return new mongoose.Types.ObjectId(rid);
+              return null;
+            })
+            .filter(Boolean);
+
+          if (reportObjectIds.length > 0) {
+            const dispatchedReport = await mongoose.connection.db
+              .collection("reports")
+              .findOne({
+                _id: { $in: reportObjectIds },
+                emergencyStatus: "dispatched",
+              });
+            if (dispatchedReport) hasDispatched = true;
+          }
+        }
+
+        // Check needs for dispatched status if not already found
+        if (!hasDispatched && mission.need_ids && mission.need_ids.length > 0) {
+          const needObjectIds = mission.need_ids
+            .map((nid) => {
+              if (nid instanceof mongoose.Types.ObjectId) return nid;
+              if (typeof nid === "object" && nid.$oid)
+                return new mongoose.Types.ObjectId(nid.$oid);
+              if (mongoose.Types.ObjectId.isValid(nid))
+                return new mongoose.Types.ObjectId(nid);
+              return null;
+            })
+            .filter(Boolean);
+
+          if (needObjectIds.length > 0) {
+            const dispatchedNeed = await mongoose.connection.db
+              .collection("needs")
+              .findOne({
+                _id: { $in: needObjectIds },
+                emergencyStatus: "dispatched",
+              });
+            if (dispatchedNeed) hasDispatched = true;
+          }
+        }
+
+        return {
+          id: mission._id.toString(),
+          routes: mission.routes || [],
+          reportIds: mission.report_ids || [],
+          status: mission.status,
+          numVehicles: mission.num_vehicles,
+          timestamp: mission.timestamp,
+          station: mission.station || null,
+          hasDispatched, // true if any report/need has been dispatched
+        };
+      })
+    );
 
     sendSuccess(res, transformedMissions, "Missions fetched successfully");
   } catch (error) {
@@ -180,7 +236,8 @@ router.patch("/missions/:id/complete", requireManager, async (req, res) => {
 /**
  * PATCH /api/missions/:id/reroute
  * Re-route a mission to a different station
- * This marks the old mission as cancelled and triggers re-routing
+ * This marks the old mission as cancelled, cancels alerts at previous station,
+ * and triggers re-routing to the new station
  */
 router.patch("/missions/:id/reroute", requireManager, async (req, res) => {
   try {
@@ -204,6 +261,9 @@ router.patch("/missions/:id/reroute", requireManager, async (req, res) => {
     if (!mission) {
       return sendError(res, "Mission not found", HTTP_STATUS.NOT_FOUND);
     }
+
+    // Collect all report/need IDs for this mission
+    const allSourceIds = [];
 
     // Mark current mission as re-routed (cancelled)
     await mongoose.connection.db.collection("missions").updateOne(
@@ -231,15 +291,22 @@ router.patch("/missions/:id/reroute", requireManager, async (req, res) => {
         .filter(Boolean);
 
       if (reportObjectIds.length > 0) {
+        allSourceIds.push(...reportObjectIds);
+
         await mongoose.connection.db.collection("reports").updateMany(
           { _id: { $in: reportObjectIds } },
           {
             $set: {
               status: "Analyzed",
               dispatch_status: "Pending",
+              emergencyStatus: "pending", // Reset to pending for new dispatch
               rerouted_to_station: station,
             },
-            $unset: { mission_id: "", assigned_station: "" },
+            $unset: {
+              mission_id: "",
+              assigned_station: "",
+              emergencyAlertId: "",
+            },
           }
         );
         logger.info(
@@ -262,15 +329,22 @@ router.patch("/missions/:id/reroute", requireManager, async (req, res) => {
         .filter(Boolean);
 
       if (needObjectIds.length > 0) {
+        allSourceIds.push(...needObjectIds);
+
         await mongoose.connection.db.collection("needs").updateMany(
           { _id: { $in: needObjectIds } },
           {
             $set: {
               status: "Verified",
               dispatch_status: "Pending",
+              emergencyStatus: "pending", // Reset to pending for new dispatch
               rerouted_to_station: station,
             },
-            $unset: { mission_id: "", assigned_station: "" },
+            $unset: {
+              mission_id: "",
+              assigned_station: "",
+              emergencyAlertId: "",
+            },
           }
         );
         logger.info(
@@ -279,11 +353,114 @@ router.patch("/missions/:id/reroute", requireManager, async (req, res) => {
       }
     }
 
+    // Cancel existing emergency alerts for these reports/needs
+    if (allSourceIds.length > 0) {
+      const cancelledAlerts = await mongoose.connection.db
+        .collection("emergencyalerts")
+        .updateMany(
+          {
+            sourceId: { $in: allSourceIds },
+            status: { $nin: ["cancelled", "resolved"] },
+          },
+          {
+            $set: {
+              status: "cancelled",
+              cancelledAt: new Date().toISOString(),
+              cancelReason: `Rerouted to ${station.name}`,
+              "sentToStations.$[].status": "cancelled",
+            },
+          }
+        );
+      logger.info(
+        `Cancelled ${cancelledAlerts.modifiedCount} emergency alerts for rerouting`
+      );
+
+      // Dispatch new alerts to the new station for each report/need
+      const reportsCollection = mongoose.connection.db.collection("reports");
+      const needsCollection = mongoose.connection.db.collection("needs");
+
+      // Get the report IDs that were part of this mission
+      if (mission.report_ids && mission.report_ids.length > 0) {
+        const reportObjectIds = mission.report_ids
+          .map((rid) => {
+            if (rid instanceof mongoose.Types.ObjectId) return rid;
+            if (typeof rid === "object" && rid.$oid)
+              return new mongoose.Types.ObjectId(rid.$oid);
+            if (mongoose.Types.ObjectId.isValid(rid))
+              return new mongoose.Types.ObjectId(rid);
+            return null;
+          })
+          .filter(Boolean);
+
+        // Fetch the actual report documents and dispatch alerts
+        const reports = await reportsCollection
+          .find({ _id: { $in: reportObjectIds } })
+          .toArray();
+
+        for (const report of reports) {
+          try {
+            const alertResult = await dispatchAlertToStation(
+              report,
+              "Report",
+              station
+            );
+            if (alertResult.success) {
+              logger.info(
+                `Dispatched reroute alert for report ${report._id} to ${station.name}`
+              );
+            }
+          } catch (alertErr) {
+            logger.warn(
+              `Failed to dispatch alert for report ${report._id}: ${alertErr.message}`
+            );
+          }
+        }
+      }
+
+      // Get the need IDs that were part of this mission
+      if (mission.need_ids && mission.need_ids.length > 0) {
+        const needObjectIds = mission.need_ids
+          .map((nid) => {
+            if (nid instanceof mongoose.Types.ObjectId) return nid;
+            if (typeof nid === "object" && nid.$oid)
+              return new mongoose.Types.ObjectId(nid.$oid);
+            if (mongoose.Types.ObjectId.isValid(nid))
+              return new mongoose.Types.ObjectId(nid);
+            return null;
+          })
+          .filter(Boolean);
+
+        // Fetch the actual need documents and dispatch alerts
+        const needs = await needsCollection
+          .find({ _id: { $in: needObjectIds } })
+          .toArray();
+
+        for (const need of needs) {
+          try {
+            const alertResult = await dispatchAlertToStation(
+              need,
+              "Need",
+              station
+            );
+            if (alertResult.success) {
+              logger.info(
+                `Dispatched reroute alert for need ${need._id} to ${station.name}`
+              );
+            }
+          } catch (alertErr) {
+            logger.warn(
+              `Failed to dispatch alert for need ${need._id}: ${alertErr.message}`
+            );
+          }
+        }
+      }
+    }
+
     logger.info(`Mission ${id} re-routed to ${station.name}`);
     sendSuccess(
       res,
-      { id, status: "Rerouted", newStation: station },
-      `Mission re-routed to ${station.name}. Logistics agent will process shortly.`
+      { id, status: "Rerouted", newStation: station, alertsDispatched: true },
+      `Mission re-routed to ${station.name}. Alerts dispatched to the new station.`
     );
   } catch (error) {
     logger.error("Error re-routing mission:", error);

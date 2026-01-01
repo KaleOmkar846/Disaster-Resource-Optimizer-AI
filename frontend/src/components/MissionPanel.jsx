@@ -163,18 +163,21 @@ function MissionPanel({
 
                     {/* Actions */}
                     <div className="mission-actions">
-                      <button
-                        className={`btn-reroute ${isRerouting ? "active" : ""}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onStartReroute(mission.id);
-                        }}
-                        disabled={reroutingMissionId && !isRerouting}
-                      >
-                        {isRerouting
-                          ? `⏳ ${t("mission.rerouteSelect")}`
-                          : `🔄 ${t("mission.reroute")}`}
-                      </button>
+                      {/* Hide reroute button if any report/need has been dispatched (orange pin) */}
+                      {!mission.hasDispatched && (
+                        <button
+                          className={`btn-reroute ${isRerouting ? "active" : ""}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onStartReroute(mission.id);
+                          }}
+                          disabled={reroutingMissionId && !isRerouting}
+                        >
+                          {isRerouting
+                            ? `⏳ ${t("mission.rerouteSelect")}`
+                            : `🔄 ${t("mission.reroute")}`}
+                        </button>
+                      )}
                       <button
                         className="btn-complete"
                         onClick={(e) => {

@@ -14,9 +14,10 @@ import {
   AccessibilitySettings,
   PinLogin,
   EmergencyStations,
+  RoleSelector,
 } from "./components";
 import { AuthProvider, useAuth, VolunteerRouteProvider } from "./contexts";
-import { VolunteerPage, DashboardPage, ResourcesPage, AddShelterPage } from "./pages";
+import { VolunteerPage, DashboardPage, ResourcesPage, AddShelterPage, PublicDashboard } from "./pages";
 import { LogOut, Globe, Settings, Shield, AlertTriangle } from "lucide-react";
 import { initSyncListeners } from "./services/syncService";
 import "./App.css";
@@ -156,6 +157,8 @@ function AuthenticatedApp() {
 function App() {
   const { isAuthenticated, loading } = useAuth();
   const { t } = useTranslation();
+  const [appMode, setAppMode] = useState(null); // null | 'roleSelect' | 'public' | 'pinLogin'
+  const [selectedRole, setSelectedRole] = useState(null); // 'manager' | 'volunteer'
 
   // Initialize sync listeners when authenticated
   useEffect(() => {
@@ -164,6 +167,41 @@ function App() {
       return cleanup;
     }
   }, [isAuthenticated]);
+
+  // Check for stored mode on mount
+  useEffect(() => {
+    const storedMode = sessionStorage.getItem("aegis_app_mode");
+    if (storedMode === "public") {
+      setAppMode("public");
+    } else if (!isAuthenticated && !loading) {
+      setAppMode("roleSelect");
+    }
+  }, [isAuthenticated, loading]);
+
+  // Handle role selection
+  const handleRoleSelect = (role) => {
+    setSelectedRole(role);
+    setAppMode("pinLogin");
+  };
+
+  // Handle public access
+  const handlePublicAccess = () => {
+    sessionStorage.setItem("aegis_app_mode", "public");
+    setAppMode("public");
+  };
+
+  // Handle exit from public mode
+  const handlePublicExit = () => {
+    sessionStorage.removeItem("aegis_app_mode");
+    setAppMode("roleSelect");
+    setSelectedRole(null);
+  };
+
+  // Handle back from PIN login
+  const handleBackFromPin = () => {
+    setAppMode("roleSelect");
+    setSelectedRole(null);
+  };
 
   if (loading) {
     return (
@@ -174,11 +212,30 @@ function App() {
     );
   }
 
-  if (!isAuthenticated) {
-    return <PinLogin />;
+  // If authenticated (Manager/Volunteer), show the main app
+  if (isAuthenticated) {
+    // Clear any public mode if authenticated
+    sessionStorage.removeItem("aegis_app_mode");
+    return <AuthenticatedApp />;
   }
 
-  return <AuthenticatedApp />;
+  // Public mode
+  if (appMode === "public") {
+    return <PublicDashboard onExit={handlePublicExit} />;
+  }
+
+  // PIN Login for Manager/Volunteer
+  if (appMode === "pinLogin") {
+    return <PinLogin onBack={handleBackFromPin} selectedRole={selectedRole} />;
+  }
+
+  // Role selection screen (default for unauthenticated users)
+  return (
+    <RoleSelector
+      onSelectRole={handleRoleSelect}
+      onPublicAccess={handlePublicAccess}
+    />
+  );
 }
 
 function AppWrapper() {

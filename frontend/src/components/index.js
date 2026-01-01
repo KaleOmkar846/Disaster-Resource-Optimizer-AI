@@ -37,3 +37,4 @@ export {
 // Authentication components
 export { default as PinLogin } from "./PinLogin.jsx";
 export { default as VolunteerManagement } from "./VolunteerManagement.jsx";
+export { default as RoleSelector } from "./RoleSelector.jsx";
