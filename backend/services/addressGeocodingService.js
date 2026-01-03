@@ -6,95 +6,84 @@ const NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org/search";
 const DEFAULT_REGION = config.geocode.defaultRegion;
 const USER_AGENT = "DisasterResponseOptimizer/1.0";
 
-// Known fallback coordinates for Pune localities when external geocoding fails
-const FALLBACK_LOCATIONS = [
-  {
-    keywords: ["shaniwar wada"],
-    label: "Shaniwar Wada, Pune",
-    lat: 18.5193825,
-    lon: 73.8553566,
-  },
-  {
-    keywords: ["fergusson college road", "fc road", "deccan"],
-    label: "Fergusson College Road, Pune",
-    lat: 18.5241485,
-    lon: 73.8385915,
-  },
-  {
-    keywords: ["jangali maharaj road", "jm road"],
-    label: "Jangali Maharaj Road, Pune",
-    lat: 18.5270553,
-    lon: 73.8526085,
-  },
-  {
-    keywords: ["dagdusheth"],
-    label: "Dagdusheth Halwai Ganpati Temple, Pune",
-    lat: 18.5167264,
-    lon: 73.8562556,
-  },
-  {
-    keywords: ["koregaon park"],
-    label: "Koregaon Park, Pune",
-    lat: 18.5366225,
-    lon: 73.8932738,
-  },
-  {
-    keywords: ["shivaji nagar", "shivajinagar"],
-    label: "Shivaji Nagar, Pune",
-    lat: 18.532172,
-    lon: 73.8496602,
-  },
-  {
-    keywords: ["swargate"],
-    label: "Swargate Bus Stand, Pune",
-    lat: 18.5002039,
-    lon: 73.8636453,
-  },
-  {
-    keywords: ["pune railway station"],
-    label: "Pune Railway Station",
-    lat: 18.5287091,
-    lon: 73.8740016,
-  },
-  {
-    keywords: ["sassoon hospital"],
-    label: "Sassoon General Hospital, Pune",
-    lat: 18.5251434,
-    lon: 73.8695664,
-  },
-  {
-    keywords: ["mg road", "mahatma gandhi road"],
-    label: "Mahatma Gandhi Road, Pune Camp",
-    lat: 18.5153584,
-    lon: 73.8796889,
-  },
-  {
-    keywords: ["pune central", "central pune", "pune city center"],
-    label: "Pune City Center",
-    lat: 18.5204,
-    lon: 73.8567,
-  },
-];
+/**
+ * Clean and normalize a location string for better geocoding results
+ */
+function normalizeLocation(location) {
+  return location
+    .replace(/[,]+/g, ", ")           // Normalize commas
+    .replace(/\s+/g, " ")             // Normalize whitespace
+    .replace(/['"]/g, "")             // Remove quotes
+    .trim();
+}
 
-function findFallbackCoordinates(location) {
-  if (!location) {
-    return null;
+/**
+ * Generate multiple query variations for a location to improve geocoding success
+ */
+function generateQueryVariations(location) {
+  const normalized = normalizeLocation(location);
+  const variations = [];
+
+  // Strategy 1: Full location with region
+  if (DEFAULT_REGION) {
+    variations.push(`${normalized}, ${DEFAULT_REGION}`);
   }
 
-  const normalized = location.toLowerCase();
-  for (const entry of FALLBACK_LOCATIONS) {
-    const match = entry.keywords.some((keyword) =>
-      normalized.includes(keyword)
-    );
+  // Strategy 2: Full location without region
+  variations.push(normalized);
 
-    if (match) {
-      logger.info(`Using fallback coordinates for "${location}"`);
-      return {
-        lat: entry.lat,
-        lon: entry.lon,
-        formattedAddress: entry.label,
-      };
+  // Strategy 3: Extract meaningful parts (split by common separators)
+  const parts = normalized.split(/[,\-&@]/g).map((p) => p.trim()).filter(Boolean);
+  
+  // Try each part individually with region
+  for (const part of parts) {
+    if (part.length > 3 && DEFAULT_REGION) {
+      variations.push(`${part}, ${DEFAULT_REGION}`);
     }
+  }
+
+  // Strategy 4: Try the last significant location part (often the most specific)
+  if (parts.length > 1) {
+    const lastPart = parts[parts.length - 1];
+    if (lastPart.length > 3 && DEFAULT_REGION) {
+      variations.push(`${lastPart}, ${DEFAULT_REGION}`);
+    }
+  }
+
+  // Strategy 5: Try combining first and last parts
+  if (parts.length > 2 && DEFAULT_REGION) {
+    variations.push(`${parts[0]}, ${parts[parts.length - 1]}, ${DEFAULT_REGION}`);
+  }
+
+  // Remove duplicates while preserving order
+  return [...new Set(variations)];
+}
+
+/**
+ * Perform a single geocoding request to Nominatim
+ */
+async function geocodeQuery(query) {
+  const url = new URL(NOMINATIM_BASE_URL);
+  url.searchParams.set("q", query);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("limit", "1");
+  url.searchParams.set("addressdetails", "1");
+
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: "application/json",
+    },
+    timeout: config.geocode.timeout,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Geocode request failed with status ${response.status}`);
+  }
+
+  const data = await response.json();
+  if (Array.isArray(data) && data.length > 0) {
+    return data[0];
   }
 
   return null;
@@ -102,6 +91,7 @@ function findFallbackCoordinates(location) {
 
 /**
  * Geocode a human readable location into latitude/longitude using OSM Nominatim.
+ * Uses multiple query strategies to maximize success rate.
  * @param {string} location - Human readable location string
  * @returns {Promise<{lat:number, lon:number, formattedAddress:string} | null>}
  */
@@ -111,47 +101,30 @@ export async function geocodeLocation(location) {
     return null;
   }
 
-  const query = DEFAULT_REGION ? `${location}, ${DEFAULT_REGION}` : location;
-  const url = new URL(NOMINATIM_BASE_URL);
-  url.searchParams.set("q", query);
-  url.searchParams.set("format", "json");
-  url.searchParams.set("limit", "1");
+  const queryVariations = generateQueryVariations(location);
+  logger.debug(`Geocoding "${location}" with ${queryVariations.length} query variations`);
 
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "application/json",
-      },
-      timeout: config.geocode.timeout,
-    });
+  for (const query of queryVariations) {
+    try {
+      logger.debug(`Trying geocode query: "${query}"`);
+      const result = await geocodeQuery(query);
 
-    if (!response.ok) {
-      throw new Error(`Geocode request failed with status ${response.status}`);
+      if (result) {
+        logger.info(`Geocoded "${location}" → (${result.lat}, ${result.lon}) using query: "${query}"`);
+        return {
+          lat: Number(result.lat),
+          lon: Number(result.lon),
+          formattedAddress: result.display_name,
+        };
+      }
+
+      // Rate limit: Nominatim requires 1 request per second
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+    } catch (error) {
+      logger.warn(`Geocode attempt failed for query "${query}": ${error.message}`);
     }
-
-    const data = await response.json();
-    if (Array.isArray(data) && data.length > 0) {
-      const result = data[0];
-      logger.info(`Geocoded "${location}" → (${result.lat}, ${result.lon})`);
-
-      return {
-        lat: Number(result.lat),
-        lon: Number(result.lon),
-        formattedAddress: result.display_name,
-      };
-    }
-
-    logger.warn(`No geocode results for: "${query}"`);
-  } catch (error) {
-    logger.error("Error geocoding location:", error.message);
   }
 
-  const fallback = findFallbackCoordinates(location);
-  if (fallback) {
-    return fallback;
-  }
-
-  logger.warn(`Unable to determine coordinates for "${location}"`);
+  logger.warn(`Unable to determine coordinates for "${location}" after trying all variations`);
   return null;
 }

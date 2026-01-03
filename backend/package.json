@@ -8,6 +8,7 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "sms:simulate": "node scripts/simulate-sms.js",
+    "sms:simulate2": "node scripts/simulate-sms2.js",
     "db:clear": "node scripts/clear-db.js --confirm",
     "agent:oracle": "node agents/oracle_agent.js",
     "agent:sentinel": "cd agents && venv/Scripts/python sentinel_agent.py",
