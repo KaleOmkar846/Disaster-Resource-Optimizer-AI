@@ -1,10 +1,28 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark-mode">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>frontend</title>
+    <script>
+      // Apply theme before page renders to prevent flash
+      (function () {
+        try {
+          const saved = localStorage.getItem("accessibilitySettings");
+          const settings = saved ? JSON.parse(saved) : { darkMode: true };
+          if (settings.darkMode) {
+            document.documentElement.classList.add("dark-mode");
+            document.documentElement.classList.remove("light-mode");
+          } else {
+            document.documentElement.classList.add("light-mode");
+            document.documentElement.classList.remove("dark-mode");
+          }
+        } catch (e) {
+          document.documentElement.classList.add("dark-mode");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
