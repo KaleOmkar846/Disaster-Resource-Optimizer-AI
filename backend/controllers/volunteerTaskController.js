@@ -53,9 +53,9 @@ const toMapNeedDto = (need, index = 0) => {
   } else {
     // Create a small offset in a spiral pattern (max ~500m radius)
     const angle = index * 137.5 * (Math.PI / 180); // Golden angle for even distribution
-    const radius = 0.002 + (index * 0.0008); // Start at ~200m, increase by ~80m per point
-    lat = GEOCODE_DEFAULTS.DEFAULT_LAT + (radius * Math.cos(angle));
-    lon = GEOCODE_DEFAULTS.DEFAULT_LON + (radius * Math.sin(angle));
+    const radius = 0.002 + index * 0.0008; // Start at ~200m, increase by ~80m per point
+    lat = GEOCODE_DEFAULTS.DEFAULT_LAT + radius * Math.cos(angle);
+    lon = GEOCODE_DEFAULTS.DEFAULT_LON + radius * Math.sin(angle);
   }
 
   return {
@@ -91,7 +91,7 @@ export const getUnverifiedTasks = asyncHandler(async (req, res) => {
   sendSuccess(
     res,
     unverifiedNeeds.map(toTaskDto),
-    "Unverified tasks retrieved successfully"
+    "Unverified tasks retrieved successfully",
   );
 });
 
@@ -113,7 +113,7 @@ export const verifyTask = asyncHandler(async (req, res) => {
       verificationNotes: volunteerNotes || "",
       verifiedAt: new Date(),
     },
-    { new: true }
+    { new: true },
   );
 
   if (!updatedNeed) {
@@ -129,21 +129,22 @@ export const verifyTask = asyncHandler(async (req, res) => {
       typeof updatedNeed.coordinates?.lat === "number" &&
       typeof updatedNeed.coordinates?.lon === "number";
 
-    // Create a copy with fallback coordinates if needed
-    const needForAlert = hasValidCoordinates
-      ? updatedNeed
-      : {
-          ...updatedNeed.toObject(),
-          coordinates: {
-            lat: GEOCODE_DEFAULTS.DEFAULT_LAT,
-            lon: GEOCODE_DEFAULTS.DEFAULT_LON,
-            formattedAddress: updatedNeed.triageData?.location || "Pune, India (approximate)",
-          },
-        };
-
+    // If no valid coordinates, persist fallback coordinates to the Need document
+    // so the logistics agent can pick it up for route generation
     if (!hasValidCoordinates) {
-      logger.info(`Task ${taskId} has no coordinates, using fallback location for alert dispatch`);
+      logger.info(
+        `Task ${taskId} has no coordinates, saving fallback location to DB for routing`,
+      );
+      updatedNeed.coordinates = {
+        lat: GEOCODE_DEFAULTS.DEFAULT_LAT,
+        lon: GEOCODE_DEFAULTS.DEFAULT_LON,
+        formattedAddress:
+          updatedNeed.triageData?.location || "Pune, India (approximate)",
+      };
+      await updatedNeed.save();
     }
+
+    const needForAlert = updatedNeed;
 
     logger.info(`Dispatching emergency alert for verified task ${taskId}`);
     const alertResult = await dispatchEmergencyAlert(needForAlert, "Need");
@@ -170,7 +171,7 @@ export const verifyTask = asyncHandler(async (req, res) => {
       verificationNotes: updatedNeed.verificationNotes,
       verifiedAt: updatedNeed.verifiedAt,
     },
-    "Task verified successfully"
+    "Task verified successfully",
   );
 });
 
@@ -188,7 +189,7 @@ export const getVerifiedTasks = asyncHandler(async (req, res) => {
   sendSuccess(
     res,
     verifiedNeeds.map(toTaskDto),
-    "Verified tasks retrieved successfully"
+    "Verified tasks retrieved successfully",
   );
 });
 
@@ -207,13 +208,17 @@ export const getNeedsForMap = asyncHandler(async (req, res) => {
   // Track index for needs without coordinates to create offset
   let noCoordIndex = 0;
   const mapReadyNeeds = needs.map((need) => {
-    const hasCoords = typeof need.coordinates?.lat === "number" && typeof need.coordinates?.lon === "number";
+    const hasCoords =
+      typeof need.coordinates?.lat === "number" &&
+      typeof need.coordinates?.lon === "number";
     const dto = toMapNeedDto(need, hasCoords ? 0 : noCoordIndex);
     if (!hasCoords) noCoordIndex++;
     return dto;
   });
 
-  logger.debug(`Found ${mapReadyNeeds.length} needs for map display (including ${mapReadyNeeds.filter(n => !n.hasExactLocation).length} with approximate location)`);
+  logger.debug(
+    `Found ${mapReadyNeeds.length} needs for map display (including ${mapReadyNeeds.filter((n) => !n.hasExactLocation).length} with approximate location)`,
+  );
 
   sendSuccess(res, mapReadyNeeds, "Map needs retrieved successfully");
 });
