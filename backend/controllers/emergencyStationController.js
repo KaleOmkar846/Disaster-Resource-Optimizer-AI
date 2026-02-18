@@ -394,10 +394,29 @@ export async function dispatchAlert(req, res) {
 export async function acknowledgeAlert(req, res) {
   try {
     const { alertId } = req.params;
-    const { stationId, notes } = req.body;
+    const { stationId, apiKey, notes } = req.body;
 
     if (!stationId) {
       return sendError(res, "Station ID is required", 400);
+    }
+
+    if (!apiKey) {
+      return sendError(res, "API key is required", 401);
+    }
+
+    // Verify API key against station
+    let station = await EmergencyStation.findOne({ stationId });
+    if (!station) {
+      station = await EmergencyStation.findOne({
+        name: { $regex: stationId, $options: "i" },
+      });
+    }
+    if (
+      station &&
+      station.apiConfig?.apiKey &&
+      station.apiConfig.apiKey !== apiKey
+    ) {
+      return sendError(res, "Invalid API key", 403);
     }
 
     const result = await processStationAcknowledgment(alertId, stationId, {
@@ -501,16 +520,17 @@ export async function stationDispatchCallback(req, res) {
       );
     }
 
-    // Verify API key if station found and apiKey provided (lenient for demo)
+    // Verify API key - reject if mismatch
+    if (!apiKey) {
+      return sendError(res, "API key is required", 401);
+    }
     if (
       station &&
-      apiKey &&
       station.apiConfig?.apiKey &&
       station.apiConfig.apiKey !== apiKey
     ) {
-      logger.warn(
-        `API key mismatch for station ${stationId}, but proceeding for demo`,
-      );
+      logger.warn(`API key mismatch for station ${stationId}`);
+      return sendError(res, "Invalid API key", 403);
     }
 
     // Update the alert status
@@ -621,12 +641,26 @@ export async function stationRejectCallback(req, res) {
       return sendError(res, "Missing required fields: alertId, stationId", 400);
     }
 
+    if (!apiKey) {
+      return sendError(res, "API key is required", 401);
+    }
+
     // Find station flexibly
     let station = await EmergencyStation.findOne({ stationId });
     if (!station) {
       station = await EmergencyStation.findOne({
         name: { $regex: stationId, $options: "i" },
       });
+    }
+
+    // Verify API key
+    if (
+      station &&
+      station.apiConfig?.apiKey &&
+      station.apiConfig.apiKey !== apiKey
+    ) {
+      logger.warn(`API key mismatch for station ${stationId}`);
+      return sendError(res, "Invalid API key", 403);
     }
 
     // Update the alert - mark this station as rejected
@@ -749,12 +783,26 @@ export async function stationResolvedCallback(req, res) {
       return sendError(res, "Missing required fields: alertId, stationId", 400);
     }
 
+    if (!apiKey) {
+      return sendError(res, "API key is required", 401);
+    }
+
     // Find station flexibly
     let station = await EmergencyStation.findOne({ stationId });
     if (!station) {
       station = await EmergencyStation.findOne({
         name: { $regex: stationId, $options: "i" },
       });
+    }
+
+    // Verify API key
+    if (
+      station &&
+      station.apiConfig?.apiKey &&
+      station.apiConfig.apiKey !== apiKey
+    ) {
+      logger.warn(`API key mismatch for station ${stationId}`);
+      return sendError(res, "Invalid API key", 403);
     }
 
     // Update the alert status

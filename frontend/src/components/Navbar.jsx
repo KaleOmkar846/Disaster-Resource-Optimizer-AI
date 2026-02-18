@@ -45,68 +45,18 @@ function Navbar({ onOpenSettings, onOpenMessaging }) {
 
   return (
     <header className="Navbar">
-      {/* Top row — brand + actions */}
-      <div className="Navbar-topRow">
-        <NavLink to="/dashboard" className="Navbar-brand">
-          <Shield size={24} className="Navbar-brandIcon" />
-          <span className="Navbar-brandName">AEGIS</span>
-          <span
-            className={`Navbar-role ${isManager ? "Navbar-role--mgr" : "Navbar-role--vol"}`}
-          >
-            {isManager ? t("common.manager") : t("common.volunteer")}
-          </span>
-        </NavLink>
+      {/* Left: brand */}
+      <NavLink to="/dashboard" className="Navbar-brand">
+        <Shield size={24} className="Navbar-brandIcon" />
+        <span className="Navbar-brandName">AEGIS</span>
+        <span
+          className={`Navbar-role ${isManager ? "Navbar-role--mgr" : "Navbar-role--vol"}`}
+        >
+          {isManager ? t("common.manager") : t("common.volunteer")}
+        </span>
+      </NavLink>
 
-        <div className="Navbar-actions">
-          {/* Language Switcher */}
-          <div className="Navbar-lang">
-            <Globe size={16} className="Navbar-langIcon" />
-            <select
-              className="Navbar-langSelect"
-              value={i18n.language}
-              onChange={(e) => i18n.changeLanguage(e.target.value)}
-              aria-label="Select language"
-            >
-              {languages.map((lang) => (
-                <option key={lang.code} value={lang.code}>
-                  {lang.nativeName}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <button
-            className="Navbar-iconBtn"
-            onClick={handleMessaging}
-            title={t("messaging.messages") || "Messages"}
-          >
-            <MessageSquare size={18} />
-            {unreadMessages > 0 && (
-              <span className="Navbar-unread">
-                {unreadMessages > 9 ? "9+" : unreadMessages}
-              </span>
-            )}
-          </button>
-
-          <button
-            className="Navbar-iconBtn"
-            onClick={() => onOpenSettings?.()}
-            title={t("settings.title")}
-          >
-            <Settings size={18} />
-          </button>
-
-          <button
-            className="Navbar-iconBtn Navbar-iconBtn--logout"
-            onClick={logout}
-            title={t("common.logout")}
-          >
-            <LogOut size={16} />
-          </button>
-        </div>
-      </div>
-
-      {/* Bottom row — nav links */}
+      {/* Center: nav links */}
       <nav className="Navbar-links">
         <NavLink
           to="/dashboard"
@@ -138,6 +88,55 @@ function Navbar({ onOpenSettings, onOpenMessaging }) {
           </NavLink>
         )}
       </nav>
+
+      {/* Right: actions */}
+      <div className="Navbar-actions">
+        {/* Language Switcher */}
+        <div className="Navbar-lang">
+          <Globe size={16} className="Navbar-langIcon" />
+          <select
+            className="Navbar-langSelect"
+            value={i18n.language}
+            onChange={(e) => i18n.changeLanguage(e.target.value)}
+            aria-label="Select language"
+          >
+            {languages.map((lang) => (
+              <option key={lang.code} value={lang.code}>
+                {lang.nativeName}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <button
+          className="Navbar-iconBtn"
+          onClick={handleMessaging}
+          title={t("messaging.messages") || "Messages"}
+        >
+          <MessageSquare size={18} />
+          {unreadMessages > 0 && (
+            <span className="Navbar-unread">
+              {unreadMessages > 9 ? "9+" : unreadMessages}
+            </span>
+          )}
+        </button>
+
+        <button
+          className="Navbar-iconBtn"
+          onClick={() => onOpenSettings?.()}
+          title={t("settings.title")}
+        >
+          <Settings size={18} />
+        </button>
+
+        <button
+          className="Navbar-iconBtn Navbar-iconBtn--logout"
+          onClick={logout}
+          title={t("common.logout")}
+        >
+          <LogOut size={16} />
+        </button>
+      </div>
     </header>
   );
 }

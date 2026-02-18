@@ -99,7 +99,7 @@ router.put(
   "/alerts/:alertId/status",
   requireAuth,
   requireManager,
-  updateAlertStatus
+  updateAlertStatus,
 );
 
 // ============================================================================
@@ -109,16 +109,16 @@ router.put(
 /**
  * @route   GET /api/emergency-stations
  * @desc    Get all registered emergency stations
- * @access  Public
+ * @access  Protected
  */
-router.get("/", getAllStations);
+router.get("/", requireAuth, getAllStations);
 
 /**
  * @route   GET /api/emergency-stations/:id
  * @desc    Get a specific emergency station
- * @access  Public
+ * @access  Protected
  */
-router.get("/:id", getStation);
+router.get("/:id", requireAuth, getStation);
 
 /**
  * @route   POST /api/emergency-stations

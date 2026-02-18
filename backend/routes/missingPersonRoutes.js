@@ -9,7 +9,11 @@ import { v4 as uuidv4 } from "uuid";
 import MissingPerson from "../models/MissingPersonModel.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
 import { HTTP_STATUS } from "../constants/index.js";
-import { requireAuth, requireManager, allowPublic } from "../middleware/authMiddleware.js";
+import {
+  requireAuth,
+  requireManager,
+  allowPublic,
+} from "../middleware/authMiddleware.js";
 import { uploadImageBuffer } from "../services/cloudinaryService.js";
 
 const router = express.Router();
@@ -63,7 +67,75 @@ router.get("/missing-persons", allowPublic, async (req, res) => {
     sendError(
       res,
       "Failed to fetch missing persons",
-      HTTP_STATUS.INTERNAL_SERVER_ERROR
+      HTTP_STATUS.INTERNAL_SERVER_ERROR,
+    );
+  }
+});
+
+/**
+ * GET /api/missing-persons/search
+ * Search for missing persons by name or description
+ */
+router.get("/missing-persons/search", requireAuth, async (req, res) => {
+  try {
+    const { q, lat, lon, radius = 5 } = req.query;
+
+    let query = { status: "missing" };
+
+    if (q) {
+      query.$text = { $search: q };
+    }
+
+    const persons = await MissingPerson.find(query)
+      .sort({ priority: -1, reportedAt: -1 })
+      .limit(20);
+
+    sendSuccess(res, persons);
+  } catch (error) {
+    console.error("Error searching missing persons:", error);
+    sendError(res, "Failed to search", HTTP_STATUS.INTERNAL_SERVER_ERROR);
+  }
+});
+
+/**
+ * GET /api/missing-persons/stats
+ * Get statistics about missing persons
+ */
+router.get("/missing-persons/stats", requireAuth, async (req, res) => {
+  try {
+    const stats = await MissingPerson.aggregate([
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const priorityStats = await MissingPerson.aggregate([
+      { $match: { status: "missing" } },
+      {
+        $group: {
+          _id: "$priority",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    sendSuccess(res, {
+      byStatus: stats.reduce((acc, s) => ({ ...acc, [s._id]: s.count }), {}),
+      byPriority: priorityStats.reduce(
+        (acc, s) => ({ ...acc, [s._id]: s.count }),
+        {},
+      ),
+      total: stats.reduce((sum, s) => sum + s.count, 0),
+    });
+  } catch (error) {
+    console.error("Error fetching stats:", error);
+    sendError(
+      res,
+      "Failed to fetch statistics",
+      HTTP_STATUS.INTERNAL_SERVER_ERROR,
     );
   }
 });
@@ -124,7 +196,7 @@ router.post(
         return sendError(
           res,
           "Full name and reporter contact are required",
-          HTTP_STATUS.BAD_REQUEST
+          HTTP_STATUS.BAD_REQUEST,
         );
       }
 
@@ -186,10 +258,10 @@ router.post(
       sendError(
         res,
         "Failed to submit report",
-        HTTP_STATUS.INTERNAL_SERVER_ERROR
+        HTTP_STATUS.INTERNAL_SERVER_ERROR,
       );
     }
-  }
+  },
 );
 
 /**
@@ -217,7 +289,7 @@ router.patch("/missing-persons/:id/found", requireAuth, async (req, res) => {
           updatedAt: new Date(),
         },
       },
-      { new: true }
+      { new: true },
     );
 
     if (!person) {
@@ -246,7 +318,7 @@ router.patch("/missing-persons/:id/reunited", requireAuth, async (req, res) => {
           updatedAt: new Date(),
         },
       },
-      { new: true }
+      { new: true },
     );
 
     if (!person) {
@@ -281,7 +353,7 @@ router.post("/missing-persons/:id/match", requireAuth, async (req, res) => {
         },
         $set: { updatedAt: new Date() },
       },
-      { new: true }
+      { new: true },
     );
 
     if (!person) {
@@ -292,74 +364,6 @@ router.post("/missing-persons/:id/match", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("Error adding match:", error);
     sendError(res, "Failed to add match", HTTP_STATUS.INTERNAL_SERVER_ERROR);
-  }
-});
-
-/**
- * GET /api/missing-persons/search
- * Search for missing persons by name or description
- */
-router.get("/missing-persons/search", requireAuth, async (req, res) => {
-  try {
-    const { q, lat, lon, radius = 5 } = req.query;
-
-    let query = { status: "missing" };
-
-    if (q) {
-      query.$text = { $search: q };
-    }
-
-    const persons = await MissingPerson.find(query)
-      .sort({ priority: -1, reportedAt: -1 })
-      .limit(20);
-
-    sendSuccess(res, persons);
-  } catch (error) {
-    console.error("Error searching missing persons:", error);
-    sendError(res, "Failed to search", HTTP_STATUS.INTERNAL_SERVER_ERROR);
-  }
-});
-
-/**
- * GET /api/missing-persons/stats
- * Get statistics about missing persons
- */
-router.get("/missing-persons/stats", requireAuth, async (req, res) => {
-  try {
-    const stats = await MissingPerson.aggregate([
-      {
-        $group: {
-          _id: "$status",
-          count: { $sum: 1 },
-        },
-      },
-    ]);
-
-    const priorityStats = await MissingPerson.aggregate([
-      { $match: { status: "missing" } },
-      {
-        $group: {
-          _id: "$priority",
-          count: { $sum: 1 },
-        },
-      },
-    ]);
-
-    sendSuccess(res, {
-      byStatus: stats.reduce((acc, s) => ({ ...acc, [s._id]: s.count }), {}),
-      byPriority: priorityStats.reduce(
-        (acc, s) => ({ ...acc, [s._id]: s.count }),
-        {}
-      ),
-      total: stats.reduce((sum, s) => sum + s.count, 0),
-    });
-  } catch (error) {
-    console.error("Error fetching stats:", error);
-    sendError(
-      res,
-      "Failed to fetch statistics",
-      HTTP_STATUS.INTERNAL_SERVER_ERROR
-    );
   }
 });
 

@@ -6,16 +6,10 @@
   top: 0;
   z-index: 100;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   background: var(--surface);
   border-bottom: 1px solid var(--border-color);
-}
-
-/* ---- Top row: brand + actions ---- */
-.Navbar-topRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   height: 60px;
   padding: 0 24px;
 }
@@ -61,14 +55,13 @@
   color: #fff;
 }
 
-/* ---- Nav links (bottom row) ---- */
+/* ---- Nav links (center) ---- */
 .Navbar-links {
   display: flex;
   align-items: center;
-  width: 100%;
+  flex: 1;
   gap: 6px;
-  padding: 0 24px 8px;
-  justify-content: space-between;
+  justify-content: center;
 }
 
 .Navbar-link {
@@ -76,7 +69,6 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 1;
   padding: 8px 16px;
   color: var(--text-secondary);
   text-decoration: none;
@@ -207,24 +199,44 @@
 }
 
 /* ==========================================
-   RESPONSIVE — Tablet
+   RESPONSIVE — Tablet (two rows)
    ========================================== */
 @media (max-width: 768px) {
-  .Navbar-topRow {
-    height: 52px;
-    padding: 0 16px;
+  .Navbar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    height: auto;
+    padding: 8px 16px;
+    gap: 0;
+  }
+
+  .Navbar-brand {
+    order: 1;
+    flex-shrink: 0;
+  }
+
+  .Navbar-actions {
+    order: 2;
+    margin-left: auto;
+  }
+
+  .Navbar-links {
+    order: 3;
+    width: 100%;
+    display: flex;
+    gap: 4px;
+    padding: 8px 0 2px;
+    margin-top: 6px;
+    border-top: 1px solid var(--border-color);
+    justify-content: center;
   }
 
   .Navbar-brandName {
     font-size: 1.1rem;
   }
 
-  .Navbar-links {
-    padding: 0 16px 6px;
-  }
-
   .Navbar-link {
-    padding: 7px 12px;
+    padding: 7px 14px;
     font-size: 0.88rem;
   }
 
@@ -247,9 +259,8 @@
    RESPONSIVE — Mobile
    ========================================== */
 @media (max-width: 480px) {
-  .Navbar-topRow {
-    height: 46px;
-    padding: 0 10px;
+  .Navbar {
+    padding: 6px 10px;
   }
 
   .Navbar-brand {
@@ -257,7 +268,7 @@
   }
 
   .Navbar-brandName {
-    display: none;
+    font-size: 0.95rem;
   }
 
   .Navbar-role {
@@ -265,12 +276,13 @@
   }
 
   .Navbar-links {
-    padding: 0 10px 6px;
-    gap: 2px;
+    padding: 6px 0 0;
+    margin-top: 4px;
+    gap: 4px;
   }
 
   .Navbar-link {
-    padding: 6px 10px;
+    padding: 6px 12px;
     font-size: 0.82rem;
   }
 
@@ -288,27 +300,24 @@
   }
 
   .Navbar-iconBtn {
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
   }
 }
 
 /* Very small phones */
-@media (max-width: 360px) {
-  .Navbar-topRow {
-    padding: 0 8px;
-  }
-
-  .Navbar-links {
-    padding: 0 8px 6px;
+@media (max-width: 380px) {
+  .Navbar-brandName {
+    font-size: 0.85rem;
   }
 
   .Navbar-link {
     padding: 6px 8px;
+    font-size: 0.78rem;
   }
 
   .Navbar-iconBtn {
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
   }
 }

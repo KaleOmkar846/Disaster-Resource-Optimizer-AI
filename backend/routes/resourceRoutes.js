@@ -25,11 +25,11 @@ router.get("/summary", requireAuth, getResourceSummary);
 router.get("/stations", requireAuth, getAllStations);
 router.get("/stations/:id", requireAuth, getStation);
 router.post("/stations", requireManager, createStation);
-router.patch("/stations/:id", requireAuth, updateStation);
+router.patch("/stations/:id", requireManager, updateStation);
 router.delete("/stations/:id", requireManager, deleteStation);
 
 // Deployment operations
-router.patch("/stations/:id/deploy", requireAuth, deployResources);
-router.patch("/stations/:id/return", requireAuth, returnResources);
+router.patch("/stations/:id/deploy", requireManager, deployResources);
+router.patch("/stations/:id/return", requireManager, returnResources);
 
 export default router;

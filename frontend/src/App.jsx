@@ -32,6 +32,11 @@ const queryClient = new QueryClient({
   },
 });
 
+function ManagerRoute({ children }) {
+  const { isManager } = useAuth();
+  return isManager ? children : <Navigate to="/dashboard" replace />;
+}
+
 function AuthenticatedApp() {
   const { t } = useTranslation();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -59,9 +64,30 @@ function AuthenticatedApp() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/tasks" element={<VolunteerPage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/resources" element={<ResourcesPage />} />
-            <Route path="/add-shelter" element={<AddShelterPage />} />
-            <Route path="/emergency-stations" element={<EmergencyStations />} />
+            <Route
+              path="/resources"
+              element={
+                <ManagerRoute>
+                  <ResourcesPage />
+                </ManagerRoute>
+              }
+            />
+            <Route
+              path="/add-shelter"
+              element={
+                <ManagerRoute>
+                  <AddShelterPage />
+                </ManagerRoute>
+              }
+            />
+            <Route
+              path="/emergency-stations"
+              element={
+                <ManagerRoute>
+                  <EmergencyStations />
+                </ManagerRoute>
+              }
+            />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </main>

@@ -8,7 +8,11 @@ import { v4 as uuidv4 } from "uuid";
 import Shelter from "../models/ShelterModel.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
 import { HTTP_STATUS } from "../constants/index.js";
-import { requireAuth, requireManager } from "../middleware/authMiddleware.js";
+import {
+  requireAuth,
+  requireManager,
+  allowPublic,
+} from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -16,7 +20,7 @@ const router = express.Router();
  * GET /api/shelters/public
  * Get all open shelters (no auth required) - for public map view
  */
-router.get("/shelters/public", async (req, res) => {
+router.get("/shelters/public", allowPublic, async (req, res) => {
   try {
     const shelters = await Shelter.find({ status: { $in: ["open", "full"] } })
       .select(

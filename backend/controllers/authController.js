@@ -22,7 +22,9 @@ const ensureDefaultManager = async () => {
   if (existing.role !== "manager") updates.role = "manager";
   if (Object.keys(updates).length > 0) {
     await User.updateOne({ _id: existing._id }, { $set: updates });
-    console.log(`Default manager (self-heal) reactivated with PIN: ${defaultPin}`);
+    console.log(
+      `Default manager (self-heal) reactivated with PIN: ${defaultPin}`,
+    );
   }
 };
 
@@ -119,17 +121,8 @@ export const registerVolunteer = async (req, res) => {
   try {
     const { name, phone, email, skills, role } = req.body;
 
-    // Check if requester is a manager
-    const managerPin = req.headers["x-auth-pin"];
-    if (managerPin) {
-      const manager = await User.findOne({ pin: managerPin, role: "manager" });
-      if (!manager) {
-        return res.status(403).json({
-          success: false,
-          message: "Only managers can register new users",
-        });
-      }
-    }
+    // requireManager middleware already verified the user is an authenticated manager
+    // req.user is guaranteed to be a manager at this point
 
     if (!name) {
       return res.status(400).json({
@@ -149,11 +142,7 @@ export const registerVolunteer = async (req, res) => {
       email,
       skills: skills || [],
       role: role === "manager" ? "manager" : "volunteer",
-      registeredBy: managerPin
-        ? (
-            await User.findOne({ pin: managerPin })
-          )?._id
-        : null,
+      registeredBy: req.user._id,
     });
 
     res.status(201).json({
@@ -253,7 +242,7 @@ export const deactivateVolunteer = async (req, res) => {
     const user = await User.findByIdAndUpdate(
       id,
       { isActive: false },
-      { new: true }
+      { new: true },
     );
 
     if (!user) {
