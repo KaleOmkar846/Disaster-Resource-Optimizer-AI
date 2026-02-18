@@ -6,22 +6,21 @@
   top: 0;
   z-index: 100;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 60px;
-  padding: 0 24px;
+  flex-direction: column;
   background: var(--surface);
   border-bottom: 1px solid var(--border-color);
 }
 
-/* ---- Left: brand + links ---- */
-.Navbar-left {
+/* ---- Top row: brand + actions ---- */
+.Navbar-topRow {
   display: flex;
   align-items: center;
-  gap: 28px;
-  min-width: 0;
+  justify-content: space-between;
+  height: 60px;
+  padding: 0 24px;
 }
 
+/* ---- Left: brand ---- */
 .Navbar-brand {
   display: flex;
   align-items: center;
@@ -62,17 +61,22 @@
   color: #fff;
 }
 
-/* ---- Nav links ---- */
+/* ---- Nav links (bottom row) ---- */
 .Navbar-links {
   display: flex;
   align-items: center;
+  width: 100%;
   gap: 6px;
+  padding: 0 24px 8px;
+  justify-content: space-between;
 }
 
 .Navbar-link {
   position: relative;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  flex: 1;
   padding: 8px 16px;
   color: var(--text-secondary);
   text-decoration: none;
@@ -206,17 +210,17 @@
    RESPONSIVE — Tablet
    ========================================== */
 @media (max-width: 768px) {
-  .Navbar {
-    height: 56px;
+  .Navbar-topRow {
+    height: 52px;
     padding: 0 16px;
-  }
-
-  .Navbar-left {
-    gap: 20px;
   }
 
   .Navbar-brandName {
     font-size: 1.1rem;
+  }
+
+  .Navbar-links {
+    padding: 0 16px 6px;
   }
 
   .Navbar-link {
@@ -243,15 +247,9 @@
    RESPONSIVE — Mobile
    ========================================== */
 @media (max-width: 480px) {
-  .Navbar {
-    height: 50px;
+  .Navbar-topRow {
+    height: 46px;
     padding: 0 10px;
-    gap: 6px;
-  }
-
-  .Navbar-left {
-    gap: 8px;
-    overflow: hidden;
   }
 
   .Navbar-brand {
@@ -266,22 +264,14 @@
     display: none;
   }
 
-  /* Show icons, hide text on mobile */
-  .Navbar-linkIcon {
-    display: block;
-  }
-
-  .Navbar-linkText {
-    display: none;
-  }
-
   .Navbar-links {
+    padding: 0 10px 6px;
     gap: 2px;
   }
 
   .Navbar-link {
-    padding: 8px 10px;
-    font-size: 0.85rem;
+    padding: 6px 10px;
+    font-size: 0.82rem;
   }
 
   .Navbar-link--active::after {
@@ -305,12 +295,16 @@
 
 /* Very small phones */
 @media (max-width: 360px) {
-  .Navbar {
+  .Navbar-topRow {
     padding: 0 8px;
   }
 
+  .Navbar-links {
+    padding: 0 8px 6px;
+  }
+
   .Navbar-link {
-    padding: 8px 8px;
+    padding: 6px 8px;
   }
 
   .Navbar-iconBtn {

@@ -45,8 +45,8 @@ function Navbar({ onOpenSettings, onOpenMessaging }) {
 
   return (
     <header className="Navbar">
-      {/* Left — brand + links */}
-      <div className="Navbar-left">
+      {/* Top row — brand + actions */}
+      <div className="Navbar-topRow">
         <NavLink to="/dashboard" className="Navbar-brand">
           <Shield size={24} className="Navbar-brandIcon" />
           <span className="Navbar-brandName">AEGIS</span>
@@ -57,87 +57,87 @@ function Navbar({ onOpenSettings, onOpenMessaging }) {
           </span>
         </NavLink>
 
-        <nav className="Navbar-links">
-          <NavLink
-            to="/dashboard"
-            className={({ isActive }) =>
-              `Navbar-link ${isActive ? "Navbar-link--active" : ""}`
-            }
-          >
-            <LayoutDashboard size={16} className="Navbar-linkIcon" />
-            <span className="Navbar-linkText">{t("nav.dashboard")}</span>
-          </NavLink>
-          <NavLink
-            to="/tasks"
-            className={({ isActive }) =>
-              `Navbar-link ${isActive ? "Navbar-link--active" : ""}`
-            }
-          >
-            <ClipboardList size={16} className="Navbar-linkIcon" />
-            <span className="Navbar-linkText">{t("nav.tasks")}</span>
-          </NavLink>
-          {isManager && (
-            <NavLink
-              to="/emergency-stations"
-              className={({ isActive }) =>
-                `Navbar-link ${isActive ? "Navbar-link--active" : ""}`
-              }
+        <div className="Navbar-actions">
+          {/* Language Switcher */}
+          <div className="Navbar-lang">
+            <Globe size={16} className="Navbar-langIcon" />
+            <select
+              className="Navbar-langSelect"
+              value={i18n.language}
+              onChange={(e) => i18n.changeLanguage(e.target.value)}
+              aria-label="Select language"
             >
-              <Radio size={16} className="Navbar-linkIcon" />
-              <span className="Navbar-linkText">{t("nav.stations")}</span>
-            </NavLink>
-          )}
-        </nav>
-      </div>
+              {languages.map((lang) => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.nativeName}
+                </option>
+              ))}
+            </select>
+          </div>
 
-      {/* Right — actions */}
-      <div className="Navbar-actions">
-        {/* Language Switcher */}
-        <div className="Navbar-lang">
-          <Globe size={16} className="Navbar-langIcon" />
-          <select
-            className="Navbar-langSelect"
-            value={i18n.language}
-            onChange={(e) => i18n.changeLanguage(e.target.value)}
-            aria-label="Select language"
+          <button
+            className="Navbar-iconBtn"
+            onClick={handleMessaging}
+            title={t("messaging.messages") || "Messages"}
           >
-            {languages.map((lang) => (
-              <option key={lang.code} value={lang.code}>
-                {lang.nativeName}
-              </option>
-            ))}
-          </select>
+            <MessageSquare size={18} />
+            {unreadMessages > 0 && (
+              <span className="Navbar-unread">
+                {unreadMessages > 9 ? "9+" : unreadMessages}
+              </span>
+            )}
+          </button>
+
+          <button
+            className="Navbar-iconBtn"
+            onClick={() => onOpenSettings?.()}
+            title={t("settings.title")}
+          >
+            <Settings size={18} />
+          </button>
+
+          <button
+            className="Navbar-iconBtn Navbar-iconBtn--logout"
+            onClick={logout}
+            title={t("common.logout")}
+          >
+            <LogOut size={16} />
+          </button>
         </div>
-
-        <button
-          className="Navbar-iconBtn"
-          onClick={handleMessaging}
-          title={t("messaging.messages") || "Messages"}
-        >
-          <MessageSquare size={18} />
-          {unreadMessages > 0 && (
-            <span className="Navbar-unread">
-              {unreadMessages > 9 ? "9+" : unreadMessages}
-            </span>
-          )}
-        </button>
-
-        <button
-          className="Navbar-iconBtn"
-          onClick={() => onOpenSettings?.()}
-          title={t("settings.title")}
-        >
-          <Settings size={18} />
-        </button>
-
-        <button
-          className="Navbar-iconBtn Navbar-iconBtn--logout"
-          onClick={logout}
-          title={t("common.logout")}
-        >
-          <LogOut size={16} />
-        </button>
       </div>
+
+      {/* Bottom row — nav links */}
+      <nav className="Navbar-links">
+        <NavLink
+          to="/dashboard"
+          className={({ isActive }) =>
+            `Navbar-link ${isActive ? "Navbar-link--active" : ""}`
+          }
+        >
+          <LayoutDashboard size={16} className="Navbar-linkIcon" />
+          <span className="Navbar-linkText">{t("nav.dashboard")}</span>
+        </NavLink>
+        <NavLink
+          to="/tasks"
+          className={({ isActive }) =>
+            `Navbar-link ${isActive ? "Navbar-link--active" : ""}`
+          }
+        >
+          <ClipboardList size={16} className="Navbar-linkIcon" />
+          <span className="Navbar-linkText">{t("nav.tasks")}</span>
+        </NavLink>
+        {isManager && (
+          <NavLink
+            to="/emergency-stations"
+            className={({ isActive }) =>
+              `Navbar-link ${isActive ? "Navbar-link--active" : ""}`
+            }
+          >
+            <Radio size={16} className="Navbar-linkIcon" />
+            <span className="Navbar-linkText">{t("nav.stations")}</span>
+          </NavLink>
+        )}
+      </nav>
     </header>
   );
 }
