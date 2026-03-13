@@ -13,6 +13,7 @@ import emergencyStationRoutes from "./emergencyStationRoutes.js";
 import volunteerMessageRoutes from "./volunteerMessageRoutes.js";
 import analyticsRoutes from "./analyticsRoutes.js";
 import resourceRoutes from "./resourceRoutes.js";
+import dispatchRoutes from "./dispatchRoutes.js";
 
 const router = express.Router();
 
@@ -28,6 +29,7 @@ router.use(shelterRoutes); // /shelters/*
 router.use(routeRoutes); // /routes/*
 router.use(volunteerMessageRoutes); // /volunteer-messages/*, /messages/*
 router.use(analyticsRoutes); // /analytics
+router.use(dispatchRoutes); // /dispatch/*
 
 // These route files expect to be mounted at a prefix
 router.use("/reports", reportsRoutes);

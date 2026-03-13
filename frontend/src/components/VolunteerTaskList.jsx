@@ -13,8 +13,13 @@ import {
   FileText,
   CloudOff,
   RefreshCw,
+  Circle,
 } from "lucide-react";
-import { getUnverifiedTasks, verifyTask } from "../services";
+import {
+  getUnverifiedTasks,
+  verifyTask,
+  updateVolunteerAvailability,
+} from "../services";
 import {
   SYNC_COMPLETE_EVENT,
   getPendingVerificationCount,
@@ -49,6 +54,8 @@ export default function VolunteerTaskList() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [expandedTask, setExpandedTask] = useState(null);
+  const [availability, setAvailability] = useState("available");
+  const [updatingAvailability, setUpdatingAvailability] = useState(false);
   const {
     activeTask,
     startRoute,
@@ -202,8 +209,68 @@ export default function VolunteerTaskList() {
     setExpandedTask(expandedTask === taskId ? null : taskId);
   };
 
+  const handleAvailabilityChange = async (newStatus) => {
+    if (updatingAvailability) return;
+    setUpdatingAvailability(true);
+    try {
+      await updateVolunteerAvailability(newStatus);
+      setAvailability(newStatus);
+    } catch (err) {
+      console.error("Error updating availability:", err);
+    } finally {
+      setUpdatingAvailability(false);
+    }
+  };
+
+  const availabilityOptions = [
+    {
+      value: "available",
+      label: t("dispatch.available", "Available"),
+      color: "#10b981",
+    },
+    { value: "busy", label: t("dispatch.busy", "Busy"), color: "#f59e0b" },
+    {
+      value: "off_duty",
+      label: t("dispatch.offDuty", "Off Duty"),
+      color: "#6b7280",
+    },
+  ];
+
   return (
     <div className="task-list-container">
+      {/* Availability Toggle */}
+      {isVolunteer && (
+        <div className="availability-toggle">
+          <span className="availability-label">
+            <Circle
+              size={10}
+              fill={
+                availabilityOptions.find((o) => o.value === availability)?.color
+              }
+              stroke="none"
+            />
+            {t("dispatch.status", "Status")}:
+          </span>
+          <div className="availability-options">
+            {availabilityOptions.map((opt) => (
+              <button
+                key={opt.value}
+                className={`avail-btn ${availability === opt.value ? "active" : ""}`}
+                style={
+                  availability === opt.value
+                    ? { background: opt.color, color: "white" }
+                    : {}
+                }
+                onClick={() => handleAvailabilityChange(opt.value)}
+                disabled={updatingAvailability}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="task-list-header">
         <h2>{t("taskList.title")}</h2>
         <span className="task-count">{tasks?.length || 0}</span>

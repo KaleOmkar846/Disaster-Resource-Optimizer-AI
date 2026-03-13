@@ -39,6 +39,7 @@ router.post("/alerts/receive", verifyApiKey, async (req, res) => {
       title,
       description,
       needs,
+      clusterInfo,
       timestamp,
       fromStation,
     } = req.body;
@@ -96,6 +97,7 @@ router.post("/alerts/receive", verifyApiKey, async (req, res) => {
       title,
       description,
       needs,
+      clusterInfo,
       fromStation,
       originalTimestamp: timestamp,
       status: "received",

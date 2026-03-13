@@ -120,6 +120,38 @@ const NeedSchema = new mongoose.Schema(
       trim: true,
     },
     verifiedAt: Date,
+
+    // Duplicate detection & clustering
+    clusterId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Need",
+      default: null,
+    },
+    isDuplicate: {
+      type: Boolean,
+      default: false,
+    },
+    duplicateCount: {
+      type: Number,
+      default: 0,
+    },
+    // Volunteer assignment tracking (set by dispatch service)
+    assignedVolunteer: {
+      volunteerId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      volunteerName: String,
+      assignedAt: Date,
+      acceptedAt: Date,
+      declinedAt: Date,
+      completedAt: Date,
+    },
+    volunteerAssignmentStatus: {
+      type: String,
+      enum: ["unassigned", "assigned", "accepted", "declined", "completed"],
+      default: "unassigned",
+    },
   },
   {
     timestamps: true, // Adds createdAt and updatedAt timestamps
@@ -131,5 +163,11 @@ NeedSchema.index({ status: 1, createdAt: -1 });
 NeedSchema.index({ fromNumber: 1, status: 1 });
 NeedSchema.index({ "coordinates.lat": 1, "coordinates.lng": 1 });
 NeedSchema.index({ emergencyStatus: 1 });
+NeedSchema.index({ clusterId: 1 });
+NeedSchema.index({ isDuplicate: 1, "triageData.needType": 1, createdAt: -1 });
+NeedSchema.index({
+  "assignedVolunteer.volunteerId": 1,
+  volunteerAssignmentStatus: 1,
+});
 
 export default mongoose.model("Need", NeedSchema);

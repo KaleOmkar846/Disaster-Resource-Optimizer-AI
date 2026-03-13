@@ -6,6 +6,10 @@ import Need from "../models/NeedModel.js";
 import { fallbackTriage, extractLocationHint } from "../utils/textParser.js";
 import { logger } from "../utils/appLogger.js";
 import { STATUS } from "../constants/index.js";
+import {
+  findDuplicateCluster,
+  linkToCluster,
+} from "../services/deduplicationService.js";
 
 const MessagingResponse = twilio.twiml.MessagingResponse;
 
@@ -130,11 +134,22 @@ export async function handleIncomingSms(req, res) {
     const triageData = await buildTriageData(rawMessage);
     const coordinates = await resolveCoordinates(triageData, rawMessage);
 
-    // Check if location could be determined
-    if (!coordinates || !coordinates.lat || !coordinates.lng) {
+    // Check for duplicate / existing cluster (works with or without coordinates)
+    const triageLocation = triageData?.location || null;
+    const existingCluster = await findDuplicateCluster(
+      coordinates,
+      triageData.needType,
+      rawMessage,
+      triageLocation,
+    );
+
+    // If no coordinates and no cluster match, prompt for location
+    if (
+      (!coordinates || !coordinates.lat || !coordinates.lng) &&
+      !existingCluster
+    ) {
       logger.warn(`Could not determine location for SMS from ${fromNumber}`);
 
-      // Save the need anyway but with a flag indicating location is needed
       const newNeed = new Need({
         fromNumber,
         rawMessage,
@@ -147,7 +162,6 @@ export async function handleIncomingSms(req, res) {
       await newNeed.save();
       logger.info(`Need saved without location, ID: ${newNeed._id}`);
 
-      // Prompt user to provide their location
       respondWithMessage(
         res,
         200,
@@ -164,6 +178,24 @@ export async function handleIncomingSms(req, res) {
       coordinates,
     });
 
+    if (existingCluster) {
+      await newNeed.save();
+      await linkToCluster(newNeed, existingCluster);
+      logger.info(
+        `Duplicate need ${newNeed._id} clustered with ${existingCluster._id}`,
+      );
+
+      const clusterSize = (existingCluster.duplicateCount || 0) + 2; // primary + previous dupes + this one
+      respondWithMessage(
+        res,
+        200,
+        `Your report has been received and merged with an existing emergency in your area (${clusterSize} reports).\nCluster ID: ${existingCluster._id}\nA volunteer will verify it soon.`,
+      );
+      return;
+    }
+
+    // No duplicate — save as new primary need
+    newNeed.clusterId = newNeed._id;
     await newNeed.save();
     logger.info(`New need saved to DB with ID: ${newNeed._id}`);
 

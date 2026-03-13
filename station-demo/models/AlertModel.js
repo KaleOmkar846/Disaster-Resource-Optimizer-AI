@@ -52,6 +52,12 @@ const alertSchema = new mongoose.Schema(
       type: { type: String },
     },
 
+    // Cluster information (if multiple reports were merged)
+    clusterInfo: {
+      totalReports: Number,
+      duplicateCount: Number,
+    },
+
     // Status tracking
     status: {
       type: String,
@@ -101,7 +107,7 @@ const alertSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes

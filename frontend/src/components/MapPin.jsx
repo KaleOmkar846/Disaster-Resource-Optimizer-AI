@@ -6,24 +6,24 @@ import "./MapPin.css";
 const ICON_SIZE = 32;
 
 // Custom icons for different pin states
-const createCustomIcon = (variant) =>
-  new L.DivIcon({
-    className: `map-pin-icon ${variant}`,
-    html: '<span class="map-pin-inner"></span>',
+// The wrapper div is NOT rotated — only the inner pin shape rotates.
+// This keeps the cluster badge stable during zoom.
+const createCustomIcon = (variant, clusterCount = 0) => {
+  const badgeHtml =
+    clusterCount > 0
+      ? `<span class="cluster-badge">${clusterCount + 1}</span>`
+      : "";
+  return new L.DivIcon({
+    className: `map-pin-wrapper ${variant}${clusterCount > 0 ? " clustered" : ""}`,
+    iconSize: [ICON_SIZE, ICON_SIZE],
     iconAnchor: [ICON_SIZE / 2, ICON_SIZE],
     popupAnchor: [0, -ICON_SIZE + 6],
+    html: `<div class="map-pin-icon"><span class="map-pin-inner"></span>${badgeHtml}</div>`,
   });
+};
 
-// Define icons for each state
-const receivedIcon = createCustomIcon("received"); // Gray - received but not verified
-const verifiedIcon = createCustomIcon("verified"); // Green - verified but not assigned
-const assignedIcon = createCustomIcon("assigned"); // Yellow - assigned to station
-const dispatchedIcon = createCustomIcon("dispatched"); // Orange - dispatched from station
-const rejectedIcon = createCustomIcon("rejected"); // Red - rejected, needs reroute
-const selectedIcon = createCustomIcon("selected"); // Cyan - selected for action
-const resolvedIcon = createCustomIcon("resolved"); // Dim - resolved
-const inProgressIcon = createCustomIcon("in-progress");
-const reportIcon = createCustomIcon("report");
+// Icons are now created dynamically via createCustomIcon(variant, clusterCount)
+// to support cluster badge rendering on pins with duplicates.
 
 function MapPin({ need, isSelected, onClick }) {
   const { t } = useTranslation();
@@ -31,35 +31,40 @@ function MapPin({ need, isSelected, onClick }) {
   const isInProgress = need.status === "InProgress";
   const emergencyStatus = need.emergencyStatus || "none";
   const emergencyType = need.emergencyType || "general";
+  const duplicateCount = need.duplicateCount || 0;
 
   // Determine which icon to use based on emergencyStatus
-  let icon;
+  let variant;
 
   if (isSelected) {
-    icon = selectedIcon;
+    variant = "selected";
   } else if (emergencyStatus === "rejected") {
-    icon = rejectedIcon;
+    variant = "rejected";
   } else if (emergencyStatus === "dispatched") {
-    icon = dispatchedIcon;
+    variant = "dispatched";
   } else if (emergencyStatus === "assigned") {
-    icon = assignedIcon;
+    variant = "assigned";
   } else if (emergencyStatus === "resolved") {
-    icon = resolvedIcon;
+    variant = "resolved";
   } else if (
     emergencyStatus === "pending" ||
     need.status === "Verified" ||
     need.status === "Analyzed" ||
     need.status === "Analyzed_Full"
   ) {
-    icon = verifiedIcon;
+    variant = "verified";
   } else if (isInProgress) {
-    icon = inProgressIcon;
+    variant = "in-progress";
   } else if (isReport) {
-    icon = reportIcon;
+    variant = "report";
   } else {
-    // Default gray for received/unverified
-    icon = receivedIcon;
+    variant = "received";
   }
+
+  const icon =
+    duplicateCount > 0
+      ? createCustomIcon(variant, duplicateCount)
+      : createCustomIcon(variant);
 
   const getStatusLabel = () => {
     // Show emergency status if available
@@ -128,6 +133,12 @@ function MapPin({ need, isSelected, onClick }) {
             </p>
           )}
           {getEmergencyStatusBadge()}
+          {duplicateCount > 0 && (
+            <p className="pin-cluster-info" style={{ color: "#8b5cf6" }}>
+              <strong>🔗 Cluster:</strong> {duplicateCount + 1} reports for this
+              emergency
+            </p>
+          )}
           {need.assignedStation?.stationName && (
             <p className="pin-station">
               <strong>📍 {t("map.station")}:</strong>{" "}

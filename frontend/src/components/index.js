@@ -44,3 +44,6 @@ export { default as Navbar } from "./Navbar.jsx";
 
 // Offline / Sync
 export { default as SyncStatusBar } from "./SyncStatusBar.jsx";
+
+// Volunteer Dispatch
+export { default as VolunteerAssignments } from "./VolunteerAssignments.jsx";

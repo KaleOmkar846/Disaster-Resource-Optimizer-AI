@@ -4,6 +4,7 @@ import { sendSuccess } from "../utils/apiResponse.js";
 import { logger } from "../utils/appLogger.js";
 import { STATUS, GEOCODE_DEFAULTS } from "../constants/index.js";
 import { dispatchEmergencyAlert } from "../services/emergencyAlertService.js";
+import { autoAssignTask } from "../services/dispatchService.js";
 
 const MAX_UNVERIFIED = 50;
 const MAX_VERIFIED = 100;
@@ -31,6 +32,11 @@ const toTaskDto = (need) => ({
   createdAt: need.createdAt,
   lat: need.coordinates?.lat,
   lon: need.coordinates?.lng,
+  clusterId: need.clusterId?.toString() || null,
+  isDuplicate: need.isDuplicate || false,
+  duplicateCount: need.duplicateCount || 0,
+  assignedVolunteer: need.assignedVolunteer?.volunteerName || null,
+  volunteerAssignmentStatus: need.volunteerAssignmentStatus || "unassigned",
 });
 
 /**
@@ -73,7 +79,10 @@ const toMapNeedDto = (need, index = 0) => {
     location: need.triageData?.location || need.coordinates?.formattedAddress,
     verifiedAt: need.verifiedAt,
     createdAt: need.createdAt,
-    hasExactLocation: hasValidCoordinates, // Flag for UI to show approximate location indicator
+    hasExactLocation: hasValidCoordinates,
+    clusterId: need.clusterId?.toString() || null,
+    isDuplicate: need.isDuplicate || false,
+    duplicateCount: need.duplicateCount || 0,
   };
 };
 
@@ -82,7 +91,11 @@ const toMapNeedDto = (need, index = 0) => {
  * Get all unverified tasks
  */
 export const getUnverifiedTasks = asyncHandler(async (req, res) => {
-  const unverifiedNeeds = await Need.find({ status: STATUS.UNVERIFIED })
+  // Only show primary needs (not duplicates) — duplicates are handled via their cluster
+  const unverifiedNeeds = await Need.find({
+    status: STATUS.UNVERIFIED,
+    isDuplicate: { $ne: true },
+  })
     .sort({ createdAt: -1 })
     .limit(MAX_UNVERIFIED);
 
@@ -121,6 +134,54 @@ export const verifyTask = asyncHandler(async (req, res) => {
   }
 
   logger.info(`Task ${taskId} verified successfully`);
+
+  // If this need is a duplicate, skip station dispatch — the primary need handles it
+  if (updatedNeed.isDuplicate) {
+    logger.info(
+      `Task ${taskId} is a duplicate (cluster ${updatedNeed.clusterId}), skipping station dispatch`,
+    );
+
+    // Copy emergency status from the primary need if it has one
+    const primaryNeed = await Need.findById(updatedNeed.clusterId);
+    if (primaryNeed?.emergencyAlertId) {
+      updatedNeed.emergencyStatus = primaryNeed.emergencyStatus;
+      updatedNeed.emergencyAlertId = primaryNeed.emergencyAlertId;
+      updatedNeed.assignedStation = primaryNeed.assignedStation;
+      await updatedNeed.save();
+    }
+
+    sendSuccess(
+      res,
+      {
+        id: updatedNeed._id,
+        status: updatedNeed.status,
+        verificationNotes: updatedNeed.verificationNotes,
+        verifiedAt: updatedNeed.verifiedAt,
+        clusteredWith: updatedNeed.clusterId,
+      },
+      "Task verified (duplicate — station already notified via cluster)",
+    );
+    return;
+  }
+
+  // Also verify all duplicate needs in this cluster
+  if (updatedNeed.duplicateCount > 0) {
+    const bulkResult = await Need.updateMany(
+      {
+        clusterId: updatedNeed._id,
+        isDuplicate: true,
+        status: STATUS.UNVERIFIED,
+      },
+      {
+        status: STATUS.VERIFIED,
+        verificationNotes: `Auto-verified with cluster primary ${updatedNeed._id}`,
+        verifiedAt: new Date(),
+      },
+    );
+    logger.info(
+      `Auto-verified ${bulkResult.modifiedCount} duplicate needs in cluster ${updatedNeed._id}`,
+    );
+  }
 
   // Dispatch emergency alert to appropriate stations
   // Use fallback coordinates if not available
@@ -162,6 +223,11 @@ export const verifyTask = asyncHandler(async (req, res) => {
     // Don't fail the verification if alert dispatch fails
     logger.error("Error dispatching emergency alert:", alertError);
   }
+
+  // Fire-and-forget: auto-assign best available volunteer
+  autoAssignTask(updatedNeed._id).catch((err) =>
+    logger.error("Error in auto-assign after verify:", err),
+  );
 
   sendSuccess(
     res,
