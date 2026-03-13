@@ -525,6 +525,58 @@
   color: var(--text-primary);
 }
 
+.volunteer-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.dispatch-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.dispatch-status-badge.status-available {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.dispatch-status-badge.status-busy {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.dispatch-status-badge.status-off_duty {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.dispatch-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.dispatch-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-muted, #9ca3af);
+  background: var(--background, #f9fafb);
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+}
+
 .volunteer-pin {
   background: var(--background);
   color: var(--text-muted);

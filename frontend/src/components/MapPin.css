@@ -1,7 +1,16 @@
 /* Map Pin - Clear, visible markers */
-.map-pin-icon {
+
+/* Stable wrapper — Leaflet positions this; it does NOT rotate */
+.map-pin-wrapper {
   background: transparent;
   border: none;
+}
+
+/* Inner container holds the pin + badge; no transform here either */
+.map-pin-icon {
+  position: relative;
+  width: 32px;
+  height: 32px;
 }
 
 .map-pin-inner {
@@ -17,70 +26,70 @@
 
 /* Emergency Status Colors */
 /* Gray - Received but not verified */
-.map-pin-icon.received .map-pin-inner {
+.map-pin-wrapper.received .map-pin-inner {
   background-color: #6b7280;
 }
 
 /* Green - Verified but not assigned */
-.map-pin-icon.verified .map-pin-inner {
+.map-pin-wrapper.verified .map-pin-inner {
   background-color: #10b981;
 }
 
 /* Yellow - Assigned to station */
-.map-pin-icon.assigned .map-pin-inner {
+.map-pin-wrapper.assigned .map-pin-inner {
   background-color: #eab308;
 }
 
 /* Orange - Dispatched from station */
-.map-pin-icon.dispatched .map-pin-inner {
+.map-pin-wrapper.dispatched .map-pin-inner {
   background-color: #f97316;
   animation: dispatch-pulse 2s ease-in-out infinite;
 }
 
 /* Red - Rejected, needs reroute */
-.map-pin-icon.rejected .map-pin-inner {
+.map-pin-wrapper.rejected .map-pin-inner {
   background-color: #ef4444;
   animation: rejected-flash 1s ease-in-out infinite;
 }
 
 /* Cyan - Selected for action */
-.map-pin-icon.selected .map-pin-inner {
+.map-pin-wrapper.selected .map-pin-inner {
   background-color: var(--accent, #06b6d4);
   border-color: white;
   box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.3);
 }
 
 /* Dim gray - Resolved */
-.map-pin-icon.resolved .map-pin-inner {
+.map-pin-wrapper.resolved .map-pin-inner {
   background-color: #9ca3af;
   opacity: 0.7;
 }
 
 /* Legacy status colors for backward compatibility */
-.map-pin-icon.unverified .map-pin-inner {
+.map-pin-wrapper.unverified .map-pin-inner {
   background-color: #6b7280;
 }
 
-.map-pin-icon.in-progress .map-pin-inner {
+.map-pin-wrapper.in-progress .map-pin-inner {
   background-color: #f59e0b;
 }
 
 /* Report pins */
-.map-pin-icon.report .map-pin-inner {
+.map-pin-wrapper.report .map-pin-inner {
   background-color: #8b5cf6;
 }
 
-.map-pin-icon.report-selected .map-pin-inner {
+.map-pin-wrapper.report-selected .map-pin-inner {
   background-color: #a78bfa;
   box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3);
 }
 
-.map-pin-icon.report-in-progress .map-pin-inner {
+.map-pin-wrapper.report-in-progress .map-pin-inner {
   background-color: var(--primary, #3b82f6);
 }
 
 /* SOS Pin - High visibility */
-.map-pin-icon.sos .map-pin-inner {
+.map-pin-wrapper.sos .map-pin-inner {
   background-color: var(--error, #ef4444);
   animation: sos-flash 1s ease-in-out infinite;
 }
@@ -122,6 +131,37 @@
 .pin-popup {
   min-width: 160px;
   padding: var(--space-2, 8px);
+}
+
+/* Cluster badge on map pin — NOT rotated, sits on top-right of the wrapper */
+.cluster-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #8b5cf6;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  line-height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  text-align: center;
+  border: 2px solid white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.map-pin-wrapper.clustered .map-pin-icon {
+  /* no extra transform — badge inherits stable positioning */
+}
+
+.pin-popup .pin-cluster-info {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-top: var(--space-1, 4px);
 }
 
 .pin-popup p {

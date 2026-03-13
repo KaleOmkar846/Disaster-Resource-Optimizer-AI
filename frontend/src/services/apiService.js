@@ -508,3 +508,49 @@ export async function getVolunteerRoute(origin, destination) {
     throw error;
   }
 }
+
+// ============================================
+// Volunteer Dispatch API
+// ============================================
+
+export async function updateVolunteerLocation(lat, lng) {
+  const response = await apiClient.put("/dispatch/location", { lat, lng });
+  return response.data;
+}
+
+export async function updateVolunteerAvailability(status) {
+  const response = await apiClient.put("/dispatch/availability", { status });
+  return response.data;
+}
+
+export async function getMyAssignments() {
+  const response = await apiClient.get("/dispatch/my-assignments");
+  return response.data.data;
+}
+
+export async function acceptAssignment(needId) {
+  const response = await apiClient.post(`/dispatch/accept/${needId}`);
+  return response.data;
+}
+
+export async function declineAssignment(needId) {
+  const response = await apiClient.post(`/dispatch/decline/${needId}`);
+  return response.data;
+}
+
+export async function completeAssignment(needId) {
+  const response = await apiClient.post(`/dispatch/complete/${needId}`);
+  return response.data;
+}
+
+export async function getDispatchSuggestions(needId) {
+  const response = await apiClient.get(`/dispatch/suggestions/${needId}`);
+  return response.data.data;
+}
+
+export async function triggerDispatch(needId, volunteerId = null) {
+  const response = await apiClient.post(`/dispatch/assign/${needId}`, {
+    volunteerId,
+  });
+  return response.data;
+}

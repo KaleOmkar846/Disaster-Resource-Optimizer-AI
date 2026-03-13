@@ -3,21 +3,48 @@ import fetch from "node-fetch";
 const API_URL = "http://localhost:3000/api/sms";
 
 const SAMPLE_MESSAGES = [
+  // --- Wakad cluster: primary + 2 duplicates (sent together) ---
   {
     from: "+919800000001",
     body: "Building collapse near Datta Mandir Chowk, people trapped at Wakad",
   },
   {
-    from: "+919800000002",
-    body: "Massive cracks in our apartment building at Fergusson College Road, Deccan Gymkhana. We are scared it might fall.",
+    from: "+919800000011",
+    body: "People are screaming at Datta Mandir Chowk Wakad. A building has fallen. Please send rescue teams!",
   },
+  {
+    from: "+919800000012",
+    body: "I can see a collapsed structure near Datta Mandir Chowk, Wakad. Rescue needed urgently!",
+  },
+
+  // --- JM Road fire cluster: primary + 2 duplicates ---
   {
     from: "+919800000003",
     body: "Fire broke out at Jangali Maharaj Road. Smoke everywhere.",
   },
   {
+    from: "+919800000013",
+    body: "Huge fire on Jangali Maharaj Road, JM Road. Fire brigade needed immediately!",
+  },
+  {
+    from: "+919800000014",
+    body: "There is thick smoke and flames on Jangali Maharaj Road. People are running. Send help!",
+  },
+
+  // --- Railway Station medical cluster: primary + 1 duplicate ---
+  {
     from: "+919800000004",
     body: "Medical emergency at Pune Railway Station. Part of the roof fell on platform 1. Multiple injuries.",
+  },
+  {
+    from: "+919800000015",
+    body: "Someone is bleeding heavily at Pune Railway Station platform. Need ambulance ASAP!",
+  },
+
+  // --- Unique reports (no duplicates) ---
+  {
+    from: "+919800000002",
+    body: "Massive cracks in our apartment building at Fergusson College Road, Deccan Gymkhana. We are scared it might fall.",
   },
   {
     from: "+919800000005",
@@ -96,6 +123,18 @@ async function simulateSMS() {
   console.log(`Successful: ${successCount}`);
   console.log(`Failed: ${failCount}`);
   console.log("-----------------------------------");
+  console.log("\n📊 EXPECTED CLUSTERS:");
+  console.log(
+    "  1. Wakad / Datta Mandir Chowk → 3 reports (1 primary + 2 duplicates)",
+  );
+  console.log("  2. JM Road Fire → 3 reports (1 primary + 2 duplicates)");
+  console.log(
+    "  3. Railway Station Medical → 2 reports (1 primary + 1 duplicate)",
+  );
+  console.log("\n⏳ Wait a few seconds, then verify tasks from the dashboard.");
+  console.log(
+    "   Station alerts should show '🔗 X reports clustered for this emergency'",
+  );
 }
 
 simulateSMS();

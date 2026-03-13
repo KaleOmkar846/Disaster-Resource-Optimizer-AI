@@ -4,8 +4,12 @@ import {
   useState,
   useCallback,
   useEffect,
+  useRef,
 } from "react";
-import { getVolunteerRoute } from "../services/apiService";
+import {
+  getVolunteerRoute,
+  updateVolunteerLocation,
+} from "../services/apiService";
 
 const VolunteerRouteContext = createContext(null);
 
@@ -101,6 +105,32 @@ export function VolunteerRouteProvider({ children }) {
       if (retryInterval) clearInterval(retryInterval);
     };
   }, []);
+
+  // Push volunteer location to backend every 30 seconds (debounced)
+  const lastPushedLocation = useRef(null);
+  useEffect(() => {
+    const pushInterval = setInterval(() => {
+      const loc = currentLocation || lastKnownLocation;
+      if (!loc || typeof loc.lat !== "number") return;
+
+      // Skip if location hasn't changed significantly (< 10m)
+      const prev = lastPushedLocation.current;
+      if (
+        prev &&
+        Math.abs(prev.lat - loc.lat) < 0.0001 &&
+        Math.abs(prev.lng - loc.lng) < 0.0001
+      ) {
+        return;
+      }
+
+      lastPushedLocation.current = { lat: loc.lat, lng: loc.lng };
+      updateVolunteerLocation(loc.lat, loc.lng).catch(() => {
+        // Silent fail — location push is best-effort
+      });
+    }, 30000); // Every 30 seconds
+
+    return () => clearInterval(pushInterval);
+  }, [currentLocation, lastKnownLocation]);
 
   // Start route to a task location using centralized backend routing service
   const startRoute = useCallback(

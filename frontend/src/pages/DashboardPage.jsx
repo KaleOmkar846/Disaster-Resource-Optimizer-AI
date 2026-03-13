@@ -216,7 +216,8 @@ function DashboardPage() {
           typeof need.lat === "number" &&
           typeof need.lon === "number" &&
           need.status !== "Completed" &&
-          need.emergencyStatus !== "resolved", // Exclude resolved emergencies
+          need.emergencyStatus !== "resolved" &&
+          !need.isDuplicate, // Hide duplicates — only show the primary cluster pin
       ),
     [needsData],
   );

@@ -48,11 +48,39 @@ const UserSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
+    // GPS location (updated periodically from frontend)
+    location: {
+      lat: Number,
+      lng: Number,
+      updatedAt: Date,
+    },
+    // Volunteer availability for dispatch
+    availabilityStatus: {
+      type: String,
+      enum: ["available", "busy", "off_duty"],
+      default: "available",
+    },
+    // Workload tracking
+    activeTaskCount: {
+      type: Number,
+      default: 0,
+    },
+    completedTaskCount: {
+      type: Number,
+      default: 0,
+    },
+    lastTaskCompletedAt: Date,
+    // Fatigue tracking
+    shiftStartedAt: Date,
   },
   {
     timestamps: true,
   },
 );
+
+// Index for location-based volunteer queries
+UserSchema.index({ "location.lat": 1, "location.lng": 1 });
+UserSchema.index({ availabilityStatus: 1, isActive: 1 });
 
 /**
  * Hash the PIN before saving if it has been modified.

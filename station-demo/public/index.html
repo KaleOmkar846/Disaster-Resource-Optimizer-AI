@@ -1793,6 +1793,7 @@
                 ${alert.severity}/10
               </span>
             </div>
+            ${alert.clusterInfo ? `<div style="background:#8b5cf6;color:#fff;padding:4px 10px;border-radius:6px;font-size:0.8rem;font-weight:600;margin-bottom:6px;display:inline-block;">🔗 ${alert.clusterInfo.totalReports} reports clustered for this emergency</div>` : ""}
             <div class="alert-description">${
               alert.description || "No description"
             }</div>
@@ -2107,6 +2108,16 @@
           <span class="detail-label">Needs</span>
           <span class="detail-value">${alert.needs?.join(", ") || "N/A"}</span>
         </div>
+        ${
+          alert.clusterInfo
+            ? `
+        <div class="detail-row" style="background: #f3e8ff; border-radius: 8px; padding: 8px 12px;">
+          <span class="detail-label" style="color: #7c3aed; font-weight: 700;">🔗 Clustered Reports</span>
+          <span class="detail-value" style="color: #7c3aed; font-weight: 600;">${alert.clusterInfo.totalReports} citizens reported the same emergency (${alert.clusterInfo.duplicateCount} duplicate${alert.clusterInfo.duplicateCount > 1 ? "s" : ""} merged)</span>
+        </div>
+        `
+            : ""
+        }
         <div class="detail-row">
           <span class="detail-label">Received</span>
           <span class="detail-value">${new Date(

@@ -12,11 +12,13 @@ import {
   CheckCircle,
   Loader2,
   X,
+  UserCheck,
 } from "lucide-react";
 import {
   AudioReporter,
   PhotoReporter,
   VolunteerTaskList,
+  VolunteerAssignments,
   FloatingSOSButton,
   Modal,
 } from "../components";
@@ -349,11 +351,16 @@ function MissingPersonReport() {
 
 function VolunteerPage() {
   const { t } = useTranslation();
-  const [viewMode, setViewMode] = useState("tasks"); // 'tasks' | 'voice' | 'photo'
+  const [viewMode, setViewMode] = useState("tasks"); // 'tasks' | 'assignments' | 'voice' | 'photo'
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   const tabs = [
     { id: "tasks", icon: ClipboardList, label: t("volunteer.myTasks") },
+    {
+      id: "assignments",
+      icon: UserCheck,
+      label: t("dispatch.assignments", "Assignments"),
+    },
     { id: "voice", icon: Mic, label: t("volunteer.voiceReport") },
     { id: "photo", icon: Camera, label: t("volunteer.photoReport") },
   ];
@@ -391,6 +398,7 @@ function VolunteerPage() {
       {/* Content */}
       <div className="vol-content">
         {viewMode === "tasks" && <VolunteerTaskList />}
+        {viewMode === "assignments" && <VolunteerAssignments />}
         {viewMode === "voice" && <AudioReporter />}
         {viewMode === "photo" && <PhotoReporter />}
       </div>

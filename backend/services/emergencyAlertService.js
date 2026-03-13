@@ -261,6 +261,17 @@ function createAlertData(sourceData, sourceType, emergencyType) {
     sourceData.triageData?.details ||
     "Emergency situation reported";
 
+  // Cluster / duplicate info
+  const duplicateCount = sourceData.duplicateCount || 0;
+  const clusterInfo =
+    duplicateCount > 0
+      ? { totalReports: duplicateCount + 1, duplicateCount }
+      : null;
+
+  logger.info(
+    `Creating alert data: duplicateCount=${duplicateCount}, clusterInfo=${JSON.stringify(clusterInfo)}`,
+  );
+
   return {
     sourceType,
     sourceId: sourceData._id,
@@ -275,6 +286,7 @@ function createAlertData(sourceData, sourceType, emergencyType) {
     title,
     description,
     needs: sourceData.oracleData?.needs || [],
+    clusterInfo,
     metadata: {
       originalText: sourceData.text || sourceData.rawMessage,
       imageUrl: sourceData.imageUrl,
@@ -305,6 +317,7 @@ async function sendAlertToStation(station, alertData) {
         title: alertData.title,
         description: alertData.description,
         needs: alertData.needs,
+        clusterInfo: alertData.clusterInfo || null,
         timestamp: new Date().toISOString(),
         fromStation: {
           name: "Disaster Response HQ",
@@ -355,6 +368,21 @@ export async function dispatchEmergencyAlert(
   sourceType = "Report",
 ) {
   try {
+    // Re-fetch from DB to get latest duplicateCount (may have changed since sourceData was loaded)
+    if (sourceData._id && sourceType === "Need") {
+      const Need = (await import("../models/NeedModel.js")).default;
+      const freshNeed = await Need.findById(sourceData._id).lean();
+      if (freshNeed) {
+        sourceData = {
+          ...(sourceData.toObject?.() || sourceData),
+          ...freshNeed,
+        };
+        logger.info(
+          `Refreshed Need ${sourceData._id}, duplicateCount=${sourceData.duplicateCount || 0}`,
+        );
+      }
+    }
+
     // Determine emergency type
     const emergencyType = determineEmergencyType(sourceData);
     logger.info(`Determined emergency type: ${emergencyType}`);

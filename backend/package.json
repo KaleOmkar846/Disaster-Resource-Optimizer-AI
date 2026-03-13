@@ -12,6 +12,7 @@
     "sms:simulate3": "node scripts/simulate-sms3.js",
     "sms:simulate4": "node scripts/simulate-sms4.js",
     "db:clear": "node scripts/clear-db.js --confirm",
+    "seed:dispatch": "node scripts/seed-dispatch.js",
     "monitor": "node scripts/monitor-data-changes.js",
     "agent:oracle": "node agents/oracle_agent.js",
     "agent:sentinel": "cd agents && node -e \"const p=process.platform==='win32'?'venv/Scripts/python':'venv/bin/python';require('child_process').execSync(p+' sentinel_agent.py',{stdio:'inherit'})\"",

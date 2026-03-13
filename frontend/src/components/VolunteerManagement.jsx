@@ -21,6 +21,8 @@ import {
   MessageSquare,
   Send,
   X,
+  Circle,
+  ClipboardList,
 } from "lucide-react";
 import Modal from "./Modal";
 import "./VolunteerManagement.css";
@@ -37,6 +39,16 @@ const SKILL_OPTIONS = [
   { key: "translation", value: "Translation" },
   { key: "counseling", value: "Counseling" },
 ];
+
+function formatTimeAgo(date) {
+  const diffMs = Date.now() - date.getTime();
+  const diffMins = Math.round(diffMs / 60000);
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.round(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return date.toLocaleDateString();
+}
 
 export default function VolunteerManagement() {
   const { t } = useTranslation();
@@ -350,10 +362,42 @@ export default function VolunteerManagement() {
               .map((volunteer) => (
                 <div key={volunteer._id} className="volunteer-card">
                   <div className="volunteer-header">
-                    <h4>{volunteer.name}</h4>
+                    <div className="volunteer-header-left">
+                      <h4>{volunteer.name}</h4>
+                      {volunteer.availabilityStatus && (
+                        <span
+                          className={`dispatch-status-badge status-${volunteer.availabilityStatus}`}
+                        >
+                          <Circle size={8} fill="currentColor" stroke="none" />
+                          {volunteer.availabilityStatus === "available"
+                            ? t("dispatch.available", "Available")
+                            : volunteer.availabilityStatus === "busy"
+                              ? t("dispatch.busy", "Busy")
+                              : t("dispatch.offDuty", "Off Duty")}
+                        </span>
+                      )}
+                    </div>
                     <span className="volunteer-pin">
                       {t("volunteer.pin")}: {volunteer.pin}
                     </span>
+                  </div>
+
+                  {/* Dispatch stats */}
+                  <div className="dispatch-stats">
+                    <span className="dispatch-stat" title="Active tasks">
+                      <ClipboardList size={12} />
+                      {volunteer.activeTaskCount || 0} active
+                    </span>
+                    <span className="dispatch-stat" title="Completed tasks">
+                      <Check size={12} />
+                      {volunteer.completedTaskCount || 0} done
+                    </span>
+                    {volunteer.location?.updatedAt && (
+                      <span className="dispatch-stat" title="Last GPS update">
+                        GPS:{" "}
+                        {formatTimeAgo(new Date(volunteer.location.updatedAt))}
+                      </span>
+                    )}
                   </div>
 
                   <div className="volunteer-details">
