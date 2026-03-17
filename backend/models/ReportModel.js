@@ -105,6 +105,12 @@ const reportSchema = new mongoose.Schema(
       default: "none",
     },
 
+    // Emergency type determined during alert dispatch
+    emergencyType: {
+      type: String,
+      default: "general",
+    },
+
     // Emergency alert reference
     emergencyAlertId: {
       type: String,

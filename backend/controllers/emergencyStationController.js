@@ -141,12 +141,11 @@ export async function updateStation(req, res) {
       "name",
       "type",
       "location",
+      "apiConfig",
       "capabilities",
       "status",
-      "contactInfo",
-      "operatingHours",
-      "notes",
-      "callbackUrl",
+      "contact",
+      "isOperational24x7",
     ];
     const updates = {};
     for (const field of allowedFields) {
@@ -375,6 +374,7 @@ export async function dispatchAlert(req, res) {
     // Create a synthetic source data object
     const sourceData = {
       _id: null, // No source document
+      emergencyType, // Pass through so dispatch uses the correct type
       text: description,
       location: {
         lat: location.lat,

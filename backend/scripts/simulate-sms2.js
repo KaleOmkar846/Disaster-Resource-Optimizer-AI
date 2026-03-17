@@ -8,10 +8,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, "../.env") });
 
-const API_URL = "https://disaster-resource-optimizer-ai-1.onrender.com/api/sms";
-// Render's proxy terminates TLS, so the backend sees http:// internally.
-// The Twilio signature must be computed with the URL the server reconstructs.
-const SIGNING_URL = "http://disaster-resource-optimizer-ai-1.onrender.com/api/sms";
+const API_URL = "http://localhost:3000/api/sms";
+const SIGNING_URL = API_URL; // Must match the URL the server reconstructs for Twilio validation
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
 
 const SAMPLE_MESSAGE = {

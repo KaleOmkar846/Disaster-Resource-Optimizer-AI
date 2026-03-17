@@ -2743,7 +2743,7 @@
           document.getElementById("apiKeyText").textContent =
             stationConfig.apiKey || "Not configured";
           document.getElementById("alertEndpoint").textContent =
-            `http://localhost:${window.location.port}/api/alerts/receive`;
+            `${window.location.origin}/api/alerts/receive`;
         }
 
         modal.classList.add("active");
@@ -2772,6 +2772,7 @@
         const btn = document.getElementById("registerBtn");
         const status = document.getElementById("registrationStatus");
         const mainUrl = document.getElementById("mainPlatformUrl").value.trim();
+        const stationBaseUrl = window.location.origin;
 
         if (!mainUrl) {
           status.textContent = "❌ Please enter the main platform URL";
@@ -2812,7 +2813,7 @@
               address: stationConfig.location.address || "",
             },
             apiConfig: {
-              baseUrl: `http://localhost:${window.location.port}`,
+              baseUrl: stationBaseUrl,
               alertEndpoint: "/api/alerts/receive",
               apiKey: stationConfig.apiKey,
             },
@@ -2842,8 +2843,43 @@
               "✅ Station registered successfully! You should now see this station on the main platform map.";
             status.className = "registration-status success";
           } else if (response.status === 409) {
+            // Station already exists; update it so URL/key/capabilities stay current.
+            const listResp = await fetch(`${mainUrl}/api/emergency-stations`, {
+              method: "GET",
+              credentials: "include",
+            });
+
+            if (!listResp.ok) {
+              throw new Error("Station exists, but could not fetch it for update");
+            }
+
+            const listData = await listResp.json();
+            const stations = listData?.data?.stations || [];
+            const existing = stations.find(
+              (s) => s.stationId === stationConfig.stationId,
+            );
+
+            if (!existing?._id) {
+              throw new Error("Station exists, but record not found for update");
+            }
+
+            const updateResp = await fetch(
+              `${mainUrl}/api/emergency-stations/${existing._id}`,
+              {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(registrationData),
+                credentials: "include",
+              },
+            );
+
+            const updateData = await updateResp.json();
+            if (!updateResp.ok || updateData.success === false) {
+              throw new Error(updateData.message || "Failed to update station");
+            }
+
             status.textContent =
-              "⚠️ Station is already registered on the platform.";
+              "✅ Station was already registered and has been updated with current endpoint settings.";
             status.className = "registration-status success";
           } else {
             throw new Error(data.message || "Registration failed");
