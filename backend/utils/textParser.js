@@ -8,8 +8,17 @@ const LOCATION_HINT_PATTERNS = [
 const NEED_TYPE_PATTERNS = [
   { pattern: /water/i, type: "Water" },
   { pattern: /food|hungry|meal/i, type: "Food" },
-  { pattern: /medical|medicine|doctor|injured|sick|health/i, type: "Medical" },
-  { pattern: /rescue|trapped|stuck|help|emergency/i, type: "Rescue" },
+  // Medical pattern checked BEFORE the generic rescue/emergency catch-all.
+  // "ambulance" is explicitly included so messages like "Need ambulance urgently"
+  // are not mis-classified as Rescue just because they contain "urgently"/"emergency".
+  {
+    pattern:
+      /ambulance|medical|medicine|doctor|injured|sick|health|bleeding|unconscious|cardiac|paramedic/i,
+    type: "Medical",
+  },
+  // "emergency" alone is intentionally excluded here — it appears in nearly every
+  // distress message and should not override a more-specific Medical classification.
+  { pattern: /rescue|trapped|stuck|help/i, type: "Rescue" },
 ];
 
 const URGENCY_PATTERNS = [

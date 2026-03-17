@@ -111,7 +111,7 @@ const alertSchema = new mongoose.Schema(
 );
 
 // Indexes
-alertSchema.index({ alertId: 1 });
+// Note: alertId already has a unique index from `unique: true` on the field definition.
 alertSchema.index({ status: 1, createdAt: -1 });
 alertSchema.index({ severity: -1 });
 

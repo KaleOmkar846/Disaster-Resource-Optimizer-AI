@@ -141,6 +141,7 @@ const emergencyStationSchema = new mongoose.Schema(
 // Index for geospatial queries
 emergencyStationSchema.index({ "location.lat": 1, "location.lng": 1 });
 emergencyStationSchema.index({ type: 1, status: 1 });
+emergencyStationSchema.index({ capabilities: 1, status: 1 });
 
 /**
  * Calculate distance between two points using Haversine formula
@@ -175,7 +176,7 @@ emergencyStationSchema.statics.findNearest = async function (
 ) {
   const stations = await this.find({
     type,
-    status: "active",
+    status: { $in: ["active", "offline"] },
   });
 
   // Calculate distances and sort
@@ -195,7 +196,9 @@ emergencyStationSchema.statics.findNearest = async function (
 };
 
 /**
- * Find stations that can handle a specific emergency type
+ * Find stations that can handle a specific emergency type.
+ * Matches stations where the capabilities array contains the emergency type
+ * OR the station type itself matches (station type is an implicit capability).
  */
 emergencyStationSchema.statics.findByCapability = async function (
   emergencyType,
@@ -203,9 +206,11 @@ emergencyStationSchema.statics.findByCapability = async function (
   lng,
   limit = 5
 ) {
+  // Include "offline" stations so alert delivery can serve as an implicit
+  // health check and bring them back to "active" on success.
   const stations = await this.find({
-    capabilities: emergencyType,
-    status: "active",
+    $or: [{ capabilities: emergencyType }, { type: emergencyType }],
+    status: { $in: ["active", "offline"] },
   });
 
   // Calculate distances and sort

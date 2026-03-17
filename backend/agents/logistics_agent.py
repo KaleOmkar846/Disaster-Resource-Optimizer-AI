@@ -36,7 +36,8 @@ from datetime import datetime, timezone
 from pymongo import MongoClient
 
 # OSRM Configuration — set OSRM_BASE_URL to a self-hosted instance for production
-# The public demo server (router.project-osrm.org) has strict rate limits
+# The public demo server (router.project-osrm.org) has strict rate limits but
+# exposes the standard OSRM HTTP API at the root path.
 OSRM_BASE_URL = os.environ.get("OSRM_BASE_URL", "https://router.project-osrm.org")
 OSRM_TIMEOUT = 10  # seconds
 
@@ -169,8 +170,8 @@ def get_registered_stations(db):
     
     stations_collection = db[STATIONS_COLLECTION]
     
-    # Fetch all active stations
-    query = {'status': 'active'}
+    # Fetch active and offline stations (offline may just be temporarily unreachable)
+    query = {'status': {'$in': ['active', 'offline']}}
     cursor = stations_collection.find(query)
     
     # Group stations by type
@@ -188,6 +189,7 @@ def get_registered_stations(db):
             'lon': location.get('lng'),  # Convert lng to lon
             'id': str(station.get('_id')),
             'stationId': station.get('stationId'),
+            'type': station_type,
         })
     
     # Update cache
@@ -353,10 +355,98 @@ def get_verified_needs(db):
     return needs
 
 
+def find_registered_station(db, station_reference):
+    """
+    Resolve a stored station reference to a registered station record.
+
+    Args:
+        db: MongoDB database instance
+        station_reference: Mixed station reference object from MongoDB
+
+    Returns:
+        Station dict or None
+    """
+    if not station_reference:
+        return None
+
+    ref_name = station_reference.get('name') or station_reference.get('stationName')
+    ref_type = station_reference.get('type') or station_reference.get('stationType')
+    ref_id = station_reference.get('id') or station_reference.get('stationId')
+
+    if station_reference.get('lat') is not None and station_reference.get('lon') is not None:
+        return {
+            'name': ref_name or 'Unknown Station',
+            'lat': station_reference.get('lat'),
+            'lon': station_reference.get('lon'),
+            'type': ref_type,
+            'id': str(ref_id) if ref_id else None,
+            'stationId': station_reference.get('stationId'),
+        }
+
+    if station_reference.get('lat') is not None and station_reference.get('lng') is not None:
+        return {
+            'name': ref_name or 'Unknown Station',
+            'lat': station_reference.get('lat'),
+            'lon': station_reference.get('lng'),
+            'type': ref_type,
+            'id': str(ref_id) if ref_id else None,
+            'stationId': station_reference.get('stationId'),
+        }
+
+    registered_stations = get_registered_stations(db)
+    all_stations = [station for stations in registered_stations.values() for station in stations]
+
+    ref_id = str(ref_id) if ref_id is not None else None
+
+    for station in all_stations:
+        if ref_id and (station.get('id') == ref_id or str(station.get('stationId')) == ref_id):
+            return station
+
+    if ref_name:
+        ref_name_normalized = ref_name.strip().lower()
+        for station in all_stations:
+            if station.get('name', '').strip().lower() != ref_name_normalized:
+                continue
+            if ref_type and station.get('type') != ref_type:
+                continue
+            return station
+
+    return None
+
+
+def get_preassigned_station(item):
+    """
+    Return any station already chosen upstream for this item.
+
+    Priority: rerouted_to_station > assignedStation > assigned_station
+    """
+    rerouted_station = item.get('rerouted_to_station')
+    if rerouted_station:
+        return rerouted_station
+
+    assigned_station = item.get('assignedStation')
+    if assigned_station and (
+        assigned_station.get('stationId') or
+        assigned_station.get('stationName') or
+        assigned_station.get('stationType')
+    ):
+        return {
+            'stationId': assigned_station.get('stationId'),
+            'name': assigned_station.get('stationName'),
+            'type': assigned_station.get('stationType'),
+        }
+
+    legacy_assigned_station = item.get('assigned_station')
+    if legacy_assigned_station:
+        return legacy_assigned_station
+
+    return None
+
+
 def determine_station_type_for_need(need):
     """
     Determine which type of station should respond based on need type.
-    If the need was rerouted, use the rerouted_to_station instead.
+    If the need was rerouted or already assigned by alert dispatch, reuse that.
     
     Args:
         need: Need document from MongoDB
@@ -364,11 +454,10 @@ def determine_station_type_for_need(need):
     Returns:
         Station type string (police, hospital, fire, rescue)
     """
-    # Check if this need was manually rerouted to a specific station
-    rerouted_station = need.get('rerouted_to_station')
-    if rerouted_station and rerouted_station.get('type'):
-        station_type = rerouted_station.get('type')
-        print(f"[Logistics]    🔄 Rerouted to {station_type.upper()} ({rerouted_station.get('name', 'Unknown')})")
+    preassigned_station = get_preassigned_station(need)
+    if preassigned_station and preassigned_station.get('type'):
+        station_type = preassigned_station.get('type')
+        print(f"[Logistics]    Using preassigned {station_type.upper()} station ({preassigned_station.get('name', 'Unknown')})")
         return station_type
     
     need_type = need.get('triageData', {}).get('needType', '').lower()
@@ -513,11 +602,10 @@ def determine_station_type(report):
     Returns:
         Station type string (police, hospital, fire, rescue)
     """
-    # Priority 0: Check if manually rerouted to a specific station
-    rerouted = report.get('rerouted_to_station')
-    if rerouted and rerouted.get('type'):
-        print(f"[Logistics]    Report was manually rerouted to {rerouted.get('type').upper()} - {rerouted.get('name', 'Unknown')}")
-        return rerouted.get('type')
+    preassigned_station = get_preassigned_station(report)
+    if preassigned_station and preassigned_station.get('type'):
+        print(f"[Logistics]    Using preassigned {preassigned_station.get('type').upper()} station - {preassigned_station.get('name', 'Unknown')}")
+        return preassigned_station.get('type')
     
     # Check oracle data needs
     needs = report.get('oracleData', {}).get('needs', [])
@@ -659,18 +747,13 @@ def run_logistics_agent():
                         # Determine which type of station should respond
                         station_type = determine_station_type(report)
                         
-                        # Check if manually rerouted to a specific station
-                        rerouted = report.get('rerouted_to_station')
-                        if rerouted and rerouted.get('lat') and rerouted.get('lon'):
-                            # Use the specific station the user selected
-                            station = {
-                                'name': rerouted.get('name'),
-                                'lat': rerouted.get('lat'),
-                                'lon': rerouted.get('lon'),
-                                'type': rerouted.get('type')
-                            }
+                        assigned_station = find_registered_station(
+                            db,
+                            get_preassigned_station(report),
+                        )
+                        if assigned_station:
+                            station = assigned_station
                         else:
-                            # Find nearest registered station of that type
                             station = get_nearest_station(db, report_lat, report_lng, station_type)
                         
                         print(f"[Logistics] 📍 Report: {report_uuid}")
@@ -733,18 +816,13 @@ def run_logistics_agent():
                         # Determine which type of station should respond
                         station_type = determine_station_type_for_need(need)
                         
-                        # Check if manually rerouted to a specific station
-                        rerouted = need.get('rerouted_to_station')
-                        if rerouted and rerouted.get('lat') and rerouted.get('lon'):
-                            # Use the specific station the user selected
-                            station = {
-                                'name': rerouted.get('name'),
-                                'lat': rerouted.get('lat'),
-                                'lon': rerouted.get('lon'),
-                                'type': rerouted.get('type')
-                            }
+                        assigned_station = find_registered_station(
+                            db,
+                            get_preassigned_station(need),
+                        )
+                        if assigned_station:
+                            station = assigned_station
                         else:
-                            # Find nearest registered station of that type
                             station = get_nearest_station(db, need_lat, need_lon, station_type)
                         
                         need_type = need.get('triageData', {}).get('needType', 'Unknown')

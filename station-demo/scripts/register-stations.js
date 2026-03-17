@@ -81,7 +81,7 @@ const DEMO_STATIONS = [
       alertEndpoint: "/api/alerts/receive",
       apiKey: process.env.STATION_API_KEY_POLICE || "police-station-demo-key-2024",
     },
-    capabilities: ["traffic_accident", "general", "rescue"],
+    capabilities: ["police", "traffic_accident", "general", "rescue"],
     contact: {
       phone: "+91-20-12345003",
       email: "police.pimpri@demo.local",
@@ -176,17 +176,17 @@ async function registerStations() {
     console.log(`   Type: ${station.type}`);
     console.log(`   API URL: ${station.apiConfig.baseUrl}`);
 
+    const headers = {
+      "Content-Type": "application/json",
+      Cookie: authCookie,
+      "X-Auth-Pin": authPin,
+    };
+
     try {
       const response = await axios.post(
         `${MAIN_PLATFORM_URL}/api/emergency-stations`,
         station,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Cookie: authCookie,
-            "X-Auth-Pin": authPin,
-          },
-        },
+        { headers },
       );
 
       if (response.data.success !== false) {
@@ -197,8 +197,44 @@ async function registerStations() {
       }
     } catch (error) {
       if (error.response?.status === 409) {
-        console.log(`   ⏭️  Station already registered (skipped)`);
-        results.skipped.push(station.name);
+        // Station exists — delete and re-register to update URLs
+        console.log(`   ♻️  Already exists, updating registration...`);
+        try {
+          // Find the existing station ID
+          const listResp = await axios.get(
+            `${MAIN_PLATFORM_URL}/api/emergency-stations`,
+            { headers },
+          );
+          const stations = listResp.data?.data?.stations || [];
+          const existing = stations.find(
+            (s) => s.stationId === station.stationId,
+          );
+          if (existing) {
+            await axios.delete(
+              `${MAIN_PLATFORM_URL}/api/emergency-stations/${existing._id}`,
+              { headers },
+            );
+            const reRegResp = await axios.post(
+              `${MAIN_PLATFORM_URL}/api/emergency-stations`,
+              station,
+              { headers },
+            );
+            if (reRegResp.data.success !== false) {
+              console.log(`   ✅ Re-registered with updated URL!`);
+              results.success.push(station.name);
+            } else {
+              throw new Error("Re-registration failed");
+            }
+          } else {
+            console.log(`   ⏭️  Station already registered (skipped)`);
+            results.skipped.push(station.name);
+          }
+        } catch (reRegError) {
+          console.log(
+            `   ❌ Failed to re-register: ${reRegError.response?.data?.message || reRegError.message}`,
+          );
+          results.failed.push(station.name);
+        }
       } else {
         const errorMsg =
           error.response?.data?.message || error.message || "Unknown error";

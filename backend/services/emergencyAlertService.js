@@ -4,58 +4,65 @@ import EmergencyAlert from "../models/EmergencyAlertModel.js";
 import { logger } from "../utils/appLogger.js";
 
 /**
+ * Join a base URL and path, stripping trailing/leading slashes to prevent
+ * double-slash URLs that Express won't match (e.g. host//api/alerts/receive).
+ */
+function joinUrl(base, path) {
+  return `${base.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
+}
+
+/**
  * Emergency Alert Service
  * Handles dispatching alerts to registered emergency stations
  */
 
-// Mapping of disaster types to emergency service types
-// Now returns only the PRIMARY station type to avoid multiple alerts
-// Order is by priority - first match wins
-const DISASTER_TO_SERVICE_MAP = {
-  // Fire-related - Fire station is primary
-  fire: ["fire"],
-  wildfire: ["fire"],
-  explosion: ["fire"],
+// Mapping of emergency types to the capabilities that stations should have
+// This maps emergency types to capability strings that match station capabilities arrays
+const EMERGENCY_TO_CAPABILITY_MAP = {
+  // Fire-related
+  fire: "fire",
+  wildfire: "fire",
+  explosion: "fire",
 
-  // Medical emergencies - Hospital is primary
-  medical: ["hospital"],
-  injury: ["hospital"],
-  cardiac: ["hospital"],
-  hospital: ["hospital"],
+  // Medical emergencies
+  medical: "medical",
+  injury: "medical",
+  cardiac: "medical",
+  hospital: "medical",
 
-  // Rescue operations - Rescue station is primary
-  flood: ["rescue"],
-  earthquake: ["rescue"],
-  building_collapse: ["rescue"],
-  landslide: ["rescue"],
-  trapped: ["rescue"],
-  rescue: ["rescue"],
+  // Rescue operations
+  flood: "flood",
+  earthquake: "earthquake",
+  building_collapse: "building_collapse",
+  landslide: "landslide",
+  trapped: "rescue",
+  rescue: "rescue",
 
-  // Traffic and accidents - Police is primary
-  traffic_accident: ["police"],
-  accident: ["police"],
+  // Traffic and accidents
+  traffic_accident: "traffic_accident",
+  accident: "traffic_accident",
 
-  // Hazardous materials - Fire is primary
-  hazmat: ["fire"],
-  chemical: ["fire"],
-  gas_leak: ["fire"],
+  // Hazardous materials
+  hazmat: "hazmat",
+  chemical: "hazmat",
+  gas_leak: "hazmat",
 
-  // Water emergencies - Rescue is primary
-  drowning: ["rescue"],
+  // Water emergencies
+  drowning: "rescue",
 
-  // Police matters - crowd control, security incidents
-  police: ["police"],
-  crime: ["police"],
-  security: ["police"],
-  stampede: ["police"],
-  crowd: ["police"],
-  riot: ["police"],
-  panic: ["police"],
+  // Police matters
+  police: "police",
+  crime: "police",
+  security: "police",
+  stampede: "police",
+  crowd: "police",
+  riot: "police",
+  panic: "police",
 
-  // General/Other - Rescue as fallback
-  storm: ["rescue"],
-  general: ["rescue"],
-  other: ["rescue"],
+  // General/Other
+  storm: "rescue",
+  general: "general",
+  other: "general",
 };
 
 // Mapping of need types to emergency types
@@ -74,6 +81,17 @@ const NEED_TO_EMERGENCY_MAP = {
  * Determine the emergency type from report/need data
  */
 function determineEmergencyType(data) {
+  // Only use the stored emergencyType as a fast-path when it was explicitly set
+  // to something meaningful. Skip "general" because it is the default value on
+  // Need/Report documents and has not been derived from the actual message yet.
+  if (
+    data.emergencyType &&
+    data.emergencyType !== "general" &&
+    EMERGENCY_TO_CAPABILITY_MAP[data.emergencyType]
+  ) {
+    return data.emergencyType;
+  }
+
   // Check sentinelData tag first (from image analysis)
   if (data.sentinelData?.tag) {
     const tag = data.sentinelData.tag.toLowerCase();
@@ -107,25 +125,73 @@ function determineEmergencyType(data) {
   // Check text for keywords
   const text = (data.text || data.rawMessage || "").toLowerCase();
 
-  // Fire keywords (high priority)
+  // Fire keywords (highest priority)
   if (
     text.includes("fire") ||
     text.includes("burning") ||
-    text.includes("flame")
+    text.includes("flame") ||
+    text.includes("smoke") ||
+    text.includes("blaze")
   )
     return "fire";
 
   // Hazmat - check early before other keywords that might match
   if (
     text.includes("gas leak") ||
-    text.includes("gas") ||
     text.includes("chemical") ||
     text.includes("hazmat") ||
-    text.includes("hazardous")
+    text.includes("hazardous") ||
+    text.includes("toxic")
   )
     return "hazmat";
 
-  // Police/Security matters - check early since crowd control is critical
+  // Specific disaster types FIRST (before generic "rescue")
+  // These map to specific station capabilities, not the generic "rescue" capability
+
+  // Building collapse - only rescue stations have this capability
+  if (
+    text.includes("building collapse") ||
+    text.includes("building collapsed") ||
+    text.includes("collapse") ||
+    text.includes("structure collapse") ||
+    text.includes("rubble")
+  )
+    return "building_collapse";
+
+  // Flood - only rescue stations have this capability
+  if (
+    text.includes("flood") ||
+    text.includes("rising water") ||
+    text.includes("waterlogged") ||
+    text.includes("submerged") ||
+    text.includes("drowning")
+  )
+    return "flood";
+
+  // Earthquake - only rescue stations have this capability
+  if (
+    text.includes("earthquake") ||
+    text.includes("shaking") ||
+    text.includes("tremor") ||
+    text.includes("seismic")
+  )
+    return "earthquake";
+
+  // Landslide - only rescue stations have this capability
+  if (text.includes("landslide") || text.includes("mudslide"))
+    return "landslide";
+
+  // Traffic accidents - police and hospital have this capability
+  if (
+    text.includes("accident") ||
+    text.includes("crash") ||
+    text.includes("collision") ||
+    text.includes("pile up") ||
+    text.includes("hit and run")
+  )
+    return "traffic_accident";
+
+  // Police/Security matters
   if (
     text.includes("need police") ||
     text.includes("call police") ||
@@ -138,28 +204,13 @@ function determineEmergencyType(data) {
     text.includes("crime") ||
     text.includes("theft") ||
     text.includes("robbery") ||
-    text.includes("security")
+    text.includes("security") ||
+    text.includes("gunshot") ||
+    text.includes("stabbing")
   )
     return "police";
 
-  // Rescue/Disaster keywords - check BEFORE medical since rescue situations
-  // may mention ambulance/injury but the PRIMARY need is rescue
-  if (
-    text.includes("trapped") ||
-    text.includes("stuck in traffic") ||
-    text.includes("road blocked") ||
-    text.includes("fallen tree") ||
-    text.includes("rescue") ||
-    text.includes("elevator") ||
-    text.includes("flood") ||
-    text.includes("rising water") ||
-    text.includes("earthquake") ||
-    text.includes("shaking")
-  )
-    return "rescue";
-
-  // Medical/Hospital keywords - person needs medical attention
-  // Check BEFORE building_collapse to prioritize injured person
+  // Medical/Hospital keywords
   if (
     text.includes("need ambulance") ||
     text.includes("send ambulance") ||
@@ -176,17 +227,17 @@ function determineEmergencyType(data) {
   )
     return "medical";
 
-  // Building collapse without explicit injury - rescue team handles
-  if (text.includes("collapse") || text.includes("building collapsed"))
-    return "building_collapse";
-
-  // Traffic accidents
+  // Generic rescue - LAST among text checks since it's a broad capability
+  // held by many station types. Only use when no specific type matched above.
   if (
-    text.includes("accident") ||
-    text.includes("crash") ||
-    text.includes("collision")
+    text.includes("trapped") ||
+    text.includes("stuck") ||
+    text.includes("rescue") ||
+    text.includes("elevator") ||
+    text.includes("fallen tree") ||
+    text.includes("road blocked")
   )
-    return "traffic_accident";
+    return "rescue";
 
   // Check triageData needType
   if (data.triageData?.needType) {
@@ -214,12 +265,10 @@ function determineEmergencyType(data) {
 }
 
 /**
- * Get appropriate service types for an emergency
+ * Get the capability string to search for based on emergency type
  */
-function getServiceTypesForEmergency(emergencyType) {
-  return (
-    DISASTER_TO_SERVICE_MAP[emergencyType] || DISASTER_TO_SERVICE_MAP.general
-  );
+function getCapabilityForEmergency(emergencyType) {
+  return EMERGENCY_TO_CAPABILITY_MAP[emergencyType] || "general";
 }
 
 /**
@@ -304,7 +353,7 @@ function createAlertData(sourceData, sourceType, emergencyType) {
  * Send alert to a specific station
  */
 async function sendAlertToStation(station, alertData) {
-  const endpoint = `${station.apiConfig.baseUrl}${station.apiConfig.alertEndpoint}`;
+  const endpoint = joinUrl(station.apiConfig.baseUrl, station.apiConfig.alertEndpoint);
 
   try {
     const response = await axios.post(
@@ -339,6 +388,16 @@ async function sendAlertToStation(station, alertData) {
       stationId: station._id,
       status: response.status,
     });
+
+    // Successful delivery proves the station is reachable — restore to active
+    if (station.status !== "active") {
+      station.status = "active";
+      station.lastPingAt = new Date();
+      await station.save();
+      logger.info(
+        `Station ${station.name} restored to active after successful alert delivery`,
+      );
+    }
 
     return {
       success: true,
@@ -387,9 +446,9 @@ export async function dispatchEmergencyAlert(
     const emergencyType = determineEmergencyType(sourceData);
     logger.info(`Determined emergency type: ${emergencyType}`);
 
-    // Get appropriate service types
-    const serviceTypes = getServiceTypesForEmergency(emergencyType);
-    logger.info(`Service types for ${emergencyType}:`, serviceTypes);
+    // Get the capability to match against
+    const capability = getCapabilityForEmergency(emergencyType);
+    logger.info(`Capability for ${emergencyType}: ${capability}`);
 
     // Get location
     const location =
@@ -412,49 +471,44 @@ export async function dispatchEmergencyAlert(
 
     logger.info(`Created emergency alert: ${alert.alertId}`);
 
-    // TARGETED ROUTING: Send alerts only to the appropriate station type
-    // based on the emergency type (fire -> fire station, medical -> hospital, etc.)
+    // CAPABILITY-BASED ROUTING: Find stations that can handle this emergency type
+    // by searching their capabilities array, not just their type field
     const stationsToAlert = [];
 
-    for (const serviceType of serviceTypes) {
-      const nearestStations = await EmergencyStation.findNearest(
-        lat,
-        lng,
-        serviceType,
-        1, // Get nearest station of each type
-      );
+    const capableStations = await EmergencyStation.findByCapability(
+      capability,
+      lat,
+      lng,
+    );
 
-      for (const { station, distance } of nearestStations) {
-        // Avoid duplicates
-        if (!stationsToAlert.find((s) => s.station._id.equals(station._id))) {
-          stationsToAlert.push({ station, distance });
-        }
-      }
+    for (const { station, distance } of capableStations) {
+      stationsToAlert.push({ station, distance });
     }
 
-    // Fallback: If no stations found for specific types, try police and rescue
+    // Fallback: If no stations found with this capability, try "general" and "rescue"
     if (stationsToAlert.length === 0) {
       logger.info(
-        "No specific stations found, falling back to police and rescue",
+        `No stations with capability '${capability}' found, falling back to general/rescue`,
       );
 
-      const fallbackTypes = ["police", "rescue"];
-      for (const fallbackType of fallbackTypes) {
-        if (!serviceTypes.includes(fallbackType)) {
-          const nearestStations = await EmergencyStation.findNearest(
+      const fallbackCapabilities = ["general", "rescue"];
+      for (const fallbackCap of fallbackCapabilities) {
+        if (fallbackCap !== capability) {
+          const fallbackStations = await EmergencyStation.findByCapability(
+            fallbackCap,
             lat,
             lng,
-            fallbackType,
-            1,
           );
 
-          for (const { station, distance } of nearestStations) {
+          for (const { station, distance } of fallbackStations) {
             if (
               !stationsToAlert.find((s) => s.station._id.equals(station._id))
             ) {
               stationsToAlert.push({ station, distance });
             }
           }
+
+          if (stationsToAlert.length > 0) break;
         }
       }
     }
@@ -842,7 +896,7 @@ export async function pingStation(stationId) {
   }
 
   try {
-    const endpoint = `${station.apiConfig.baseUrl}/api/health`;
+    const endpoint = joinUrl(station.apiConfig.baseUrl, "/api/health");
     const response = await axios.get(endpoint, {
       headers: {
         "X-API-Key": station.apiConfig.apiKey,

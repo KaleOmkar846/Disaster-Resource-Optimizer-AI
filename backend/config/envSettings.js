@@ -1,5 +1,14 @@
 import { ENVIRONMENTS } from "../constants/index.js";
 
+function parseAllowedOrigins(origins) {
+  if (!origins) return null;
+
+  return origins
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+}
+
 /**
  * Development environment configuration
  */
@@ -8,7 +17,7 @@ const development = {
   mongoUri:
     process.env.MONGO_URI || "mongodb://localhost:27017/DisasterResponseDB",
   cors: {
-    origin: process.env.ALLOWED_ORIGINS?.split(",") || [
+    origin: parseAllowedOrigins(process.env.ALLOWED_ORIGINS) || [
       "http://localhost:5173",
       "http://localhost:3000",
     ],
@@ -27,7 +36,7 @@ const production = {
   port: process.env.PORT || 3000,
   mongoUri: process.env.MONGO_URI,
   cors: {
-    origin: process.env.ALLOWED_ORIGINS?.split(",").map((s) => s.trim()).filter(Boolean) || [],
+    origin: parseAllowedOrigins(process.env.ALLOWED_ORIGINS) || [],
     credentials: true,
   },
   logging: {

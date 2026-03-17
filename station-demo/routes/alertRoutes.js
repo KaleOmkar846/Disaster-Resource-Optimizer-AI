@@ -229,6 +229,7 @@ router.put("/alerts/:alertId/acknowledge", async (req, res) => {
         `${mainPlatformUrl}/api/emergency-stations/alerts/${alert.alertId}/acknowledge`,
         {
           stationId: stationConfig.stationId,
+          apiKey: stationConfig.apiKey || process.env.STATION_API_KEY,
           notes: req.body.notes || "Alert acknowledged",
         },
       );

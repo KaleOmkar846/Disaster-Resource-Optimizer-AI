@@ -24,7 +24,7 @@ const STATION_CONFIGS = {
     name: "City General Hospital",
     type: "hospital",
     emoji: "🏥",
-    capabilities: ["medical", "rescue", "general"],
+    capabilities: ["medical", "rescue", "traffic_accident", "general"],
     location: {
       lat: 18.5135,
       lng: 73.7604,
@@ -39,7 +39,7 @@ const STATION_CONFIGS = {
     name: "Police Station - Pimpri",
     type: "police",
     emoji: "🚔",
-    capabilities: ["traffic_accident", "rescue", "general"],
+    capabilities: ["police", "traffic_accident", "rescue", "general"],
     location: {
       lat: 18.6073,
       lng: 73.7654,
@@ -59,6 +59,7 @@ const STATION_CONFIGS = {
       "flood",
       "earthquake",
       "building_collapse",
+      "landslide",
       "general",
     ],
     location: {
